@@ -66,7 +66,7 @@ jobs:
             docker ps -aq | xargs -r docker rm -f
             docker images -q | xargs -r docker rmi -f
 
-            docker load -i ~/django-work-e.tar
+            docker load -i ~/django-work-e.tar/django-work-e.tar
 
             cat > ~/dev.env << 'EOF'
             DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
