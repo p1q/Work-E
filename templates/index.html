@@ -1,0 +1,91 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Work-E API</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to right, #6dd5ed, #2193b0);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .logo-container {
+            margin-top: 30px;
+        }
+
+        .logo {
+            display: block;
+            height: auto;
+            max-width: 100%;
+            border-radius: 20px;
+        }
+
+        .container {
+            background: #fff;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            margin-top: 30px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            margin: 15px 0;
+        }
+
+        a {
+            text-decoration: none;
+            color: #3498db;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        a:hover {
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+<div class="logo-container">
+    <img src="{% static 'logo.png' %}" alt="Logo" class="logo">
+</div>
+
+<div class="container">
+    <h1>Work-E API</h1>
+    <p>Available endpoints:</p>
+    <ul>
+        <li><a href="/api/users/">Users</a></li>
+        <li>
+            <hr style="border: none; border-top: 1px solid #ccc;">
+        </li>
+        <li><a href="/admin/">Admin Panel</a></li>
+        <li><a href="/api/swagger">Swagger UI</a></li>
+        <li><a href="/api/redoc">Redoc</a></li>
+    </ul>
+</div>
+</body>
+</html>

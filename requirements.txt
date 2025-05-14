@@ -1,0 +1,6 @@
+Django>=4.0
+djangorestframework
+psycopg2-binary
+python-dotenv
+drf-spectacular
+drf-spectacular-sidecar

@@ -1,0 +1,89 @@
+name: Work-E CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build & Package Docker Image
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: 1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --no-cache \
+            --pull \
+            --force-rm \
+            -f Dockerfile \
+            -t django-work-e .
+
+      - name: Save Docker image to tarball
+        run: docker save django-work-e -o django-work-e.tar
+
+      - name: Upload Docker image tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: django-work-e-tar
+          path: django-work-e.tar
+
+  deploy:
+    name: Deploy to Personal Server
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download Docker image tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: django-work-e-tar
+          path: ./
+
+      - name: Copy Docker image to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: 212.111.205.125
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
+          port: 22
+          source: "django-work-e.tar"
+          target: "~/django-work-e.tar"
+
+      - name: Deploy on server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 212.111.205.125
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
+          script: |
+            docker ps -aq | xargs -r docker rm -f
+            docker images -q | xargs -r docker rmi -f
+
+            docker load -i ~/django-work-e.tar
+
+            cat > ~/dev.env << 'EOF'
+            DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+            DJANGO_DEBUG=${{ secrets.DJANGO_DEBUG }}
+            ALLOWED_HOSTS=${{ secrets.ALLOWED_HOSTS }}
+
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            DB_SSLMODE=require
+            EOF
+
+            docker run -d \
+              --name work-e-app \
+              -v ~/dev.env:/app/dev.env \
+              -p 8000:8000 \
+              django-work-e \
+              python manage.py runserver 0.0.0.0:8000
