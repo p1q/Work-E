@@ -83,6 +83,7 @@ jobs:
 
             docker run -d \
               --name work-e-app \
+              --restart unless-stopped \
               -v ~/dev.env:/app/dev.env \
               -p 8000:8000 \
               django-work-e \
