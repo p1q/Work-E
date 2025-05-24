@@ -84,5 +84,6 @@ jobs:
             docker run -d \
               --name work-e-app \
               -v ~/dev.env:/app/dev.env \
+              -p 8000:8000 \
               django-work-e \
-              python manage.py runserver 127.0.0.1:8000
+              python manage.py runserver 0.0.0.0:8000
