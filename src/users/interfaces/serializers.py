@@ -62,21 +62,25 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        user = User.objects.create_user(
+        return User.objects.create_user(
             email=validated_data['email'],
             username=validated_data['username'],
             password=validated_data['password']
         )
-        return user
 
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    password = serializers.CharField()
+    password = serializers.CharField(write_only=True)
 
     def validate(self, data):
+        try:
+            User.objects.get(email__iexact=data['email'])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User does not exist.")
+
         user = authenticate(email=data['email'], password=data['password'])
-        if user is None:
-            raise serializers.ValidationError("Invalid credentials")
+        if not user:
+            raise serializers.ValidationError("Invalid credentials.")
         data['user'] = user
         return data

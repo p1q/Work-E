@@ -11,7 +11,6 @@ class GoogleAuthSerializer(serializers.Serializer):
 
     def validate_id_token(self, value):
         try:
-            # Проверяем токен у Google
             idinfo = id_token.verify_oauth2_token(
                 value,
                 requests.Request(),
@@ -20,8 +19,7 @@ class GoogleAuthSerializer(serializers.Serializer):
         except ValueError:
             raise serializers.ValidationError("Invalid Google ID token")
 
-        # Проверяем, что токен был выдан для нашего client_id
-        if idinfo['aud'] != settings.GOOGLE_CLIENT_ID:
+        if idinfo.get('aud') != settings.GOOGLE_CLIENT_ID:
             raise serializers.ValidationError("Token audience mismatch")
 
         return idinfo
@@ -35,21 +33,20 @@ class GoogleAuthSerializer(serializers.Serializer):
         avatar = info.get('picture', '')
 
         user, created = User.objects.get_or_create(
-            google_id=google_id,
+            email=email,
             defaults={
-                'email': email,
                 'username': email.split('@')[0],
                 'first_name': first_name,
                 'last_name': last_name,
+                'google_id': google_id,
                 'avatar_url': avatar,
             }
         )
-        # если нашли по email, но google_id пустой — обновляем
-        if not created and user.google_id is None:
+
+        if not created and not user.google_id:
             user.google_id = google_id
             user.avatar_url = avatar
             user.save()
 
-        # выдаём токен DRF
         token, _ = Token.objects.get_or_create(user=user)
         return {'user': user, 'token': token.key}
