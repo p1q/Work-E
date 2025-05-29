@@ -16,14 +16,14 @@ class User(AbstractUser):
         unique=True,
         help_text=_('Required. 30 characters or fewer. Letters, digits, dots, underscores and hyphens only.'),
         validators=[username_validator],
-        error_messages={
-            'unique': _("A user with that username already exists."),
-        },
+        error_messages={'unique': _("A user with that username already exists.")},
     )
-
     email = models.EmailField(_('email address'), unique=True)
     first_name = models.CharField(_('first name'), max_length=30, blank=True)
     last_name = models.CharField(_('last name'), max_length=30, blank=True)
+
+    google_id = models.CharField(_('Google ID'), max_length=255, unique=True, null=True, blank=True)
+    avatar_url = models.URLField(_('Avatar URL'), blank=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']

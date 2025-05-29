@@ -8,7 +8,8 @@ local_env = BASE_DIR / 'local.env'
 prod_env = BASE_DIR / 'dev.env'
 load_dotenv(local_env if local_env.exists() else prod_env)
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'dev-secret-key')
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'x&1%nq8g2b@3z!u$r@2@u^=l=d^9cv=h35=#zr1=y3%3hx*wuk')
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 DEBUG = True
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
