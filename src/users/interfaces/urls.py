@@ -5,6 +5,7 @@ from users.interfaces.views import (
     RegisterView,
     LoginView
 )
+from users.interfaces.views_google import GoogleLoginView
 
 urlpatterns = [
     path('', UserListCreateView.as_view(), name='user-list-create'),
