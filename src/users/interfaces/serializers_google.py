@@ -16,11 +16,18 @@ class GoogleAuthSerializer(serializers.Serializer):
                 requests.Request(),
                 settings.GOOGLE_CLIENT_ID
             )
-        except ValueError:
-            raise serializers.ValidationError("Invalid Google ID token")
+        except ValueError as e:
+            raise serializers.ValidationError(f"Invalid Google ID token: {e}")
 
-        if idinfo.get('aud') != settings.GOOGLE_CLIENT_ID:
-            raise serializers.ValidationError("Token audience mismatch")
+        # проверяем, что в токене ожидаемый CLIENT_ID
+        aud = idinfo.get('aud')
+        valid_aud = settings.GOOGLE_CLIENT_ID
+        if isinstance(aud, list):
+            if valid_aud not in aud:
+                raise serializers.ValidationError("Token audience mismatch")
+        else:
+            if aud != valid_aud:
+                raise serializers.ValidationError("Token audience mismatch")
 
         return idinfo
 
@@ -30,23 +37,19 @@ class GoogleAuthSerializer(serializers.Serializer):
         google_id = info.get('sub')
         first_name = info.get('given_name', '')
         last_name = info.get('family_name', '')
-        avatar = info.get('picture', '')
+        avatar_url = info.get('picture', '')
 
-        user, created = User.objects.get_or_create(
+        # создаём или обновляем все поля разом
+        user, _ = User.objects.update_or_create(
             email=email,
             defaults={
                 'username': email.split('@')[0],
                 'first_name': first_name,
                 'last_name': last_name,
                 'google_id': google_id,
-                'avatar_url': avatar,
+                'avatar_url': avatar_url,
             }
         )
-
-        if not created and not user.google_id:
-            user.google_id = google_id
-            user.avatar_url = avatar
-            user.save()
 
         token, _ = Token.objects.get_or_create(user=user)
         return {'user': user, 'token': token.key}
