@@ -105,7 +105,8 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+MEDIA_ROOT = Path(os.getenv('CV_FILES_PATH', BASE_DIR / 'media'))
+MEDIA_URL = '/media/'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
-CV_FILES_PATH = os.getenv('CV_FILES_PATH', 'cvs/')
