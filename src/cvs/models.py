@@ -11,7 +11,7 @@ class CV(models.Model):
         related_name='cvs'
     )
     cv_file = models.FileField(
-        upload_to='cvs/',
+        upload_to=settings.CV_FILES_PATH,
         validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'rtf'])],
         help_text='Upload your CV (pdf, doc, docx, rtf)'
     )
