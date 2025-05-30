@@ -1,6 +1,5 @@
 import re
 from rest_framework import serializers
-from django.contrib.auth import authenticate
 from django.core.validators import RegexValidator
 from users.infrastructure.models import User
 
@@ -32,10 +31,14 @@ class UserSerializer(serializers.ModelSerializer):
         validators=[sql_injection_validator]
     )
     email = serializers.EmailField(max_length=254)
+    avatar_url = serializers.URLField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'date_joined']
+        fields = [
+            'id', 'username', 'email', 'first_name', 'last_name',
+            'avatar_url', 'date_joined'
+        ]
         read_only_fields = ['id', 'date_joined']
 
 
@@ -55,6 +58,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'email', 'username', 'password']
+        read_only_fields = ['id']
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
@@ -74,6 +78,7 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
+        from django.contrib.auth import authenticate
         try:
             User.objects.get(email__iexact=data['email'])
         except User.DoesNotExist:
