@@ -81,6 +81,9 @@ jobs:
             DB_HOST=${{ secrets.DB_HOST }}
             DB_PORT=${{ secrets.DB_PORT }}
             DB_SSLMODE=require
+
+            CV_FILES_PATH=${{ secrets.CV_FILES_PATH }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             EOF
 
             docker run -d \
