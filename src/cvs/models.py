@@ -1,10 +1,15 @@
 from django.db import models
+from django.conf import settings
 from django.core.validators import FileExtensionValidator
+import os
 
 
 class CV(models.Model):
-    full_name = models.CharField(max_length=255)
-    email = models.EmailField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='cvs'
+    )
     cv_file = models.FileField(
         upload_to='cvs/',
         validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'rtf'])],
@@ -13,4 +18,8 @@ class CV(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.full_name} ({self.email})"
+        return f"CV #{self.id} for User {self.user_id}: {os.path.basename(self.cv_file.name)}"
+
+    @property
+    def filename(self):
+        return os.path.basename(self.cv_file.name)
