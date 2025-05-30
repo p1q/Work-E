@@ -22,6 +22,6 @@ class CVSerializer(serializers.ModelSerializer):
             user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             raise serializers.ValidationError({
-                'email': f'Пользователь с email "{email}" не найден.'
+                'email': f'User with email "{email}" not found.'
             })
         return CV.objects.create(user=user, **validated_data)
