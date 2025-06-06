@@ -11,15 +11,17 @@ class GoogleAuthSerializer(serializers.Serializer):
 
     def validate_id_token(self, value):
         try:
+            # Добавляем clock_skew_in_seconds=15 для учёта погрешности ±15 секунд
             idinfo = id_token.verify_oauth2_token(
                 value,
                 requests.Request(),
-                settings.GOOGLE_CLIENT_ID
+                settings.GOOGLE_CLIENT_ID,
+                clock_skew_in_seconds=15
             )
         except ValueError as e:
             raise serializers.ValidationError(f"Invalid Google ID token: {e}")
 
-        # проверяем, что в токене ожидаемый CLIENT_ID
+        # Проверяем, что в токене ожидаемый CLIENT_ID
         aud = idinfo.get('aud')
         valid_aud = settings.GOOGLE_CLIENT_ID
         if isinstance(aud, list):

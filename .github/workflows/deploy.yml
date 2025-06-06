@@ -91,6 +91,7 @@ jobs:
               --restart unless-stopped \
               -v ~/dev.env:/app/dev.env \
               -v ~/cv-files:/app/cv-files \
+              -e TZ=Europe/Kyiv \
               -p 8000:8000 \
               django-work-e \
               python manage.py runserver 0.0.0.0:8000
