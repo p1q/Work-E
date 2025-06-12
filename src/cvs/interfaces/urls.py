@@ -2,11 +2,13 @@ from django.urls import path
 from .views import (
     CVListCreateView,
     CVRetrieveDestroyView,
-    CVByEmailView
+    CVByEmailPostView,
+    LastCVByEmailPostView,
 )
 
 urlpatterns = [
     path('', CVListCreateView.as_view(), name='cv-list-create'),
     path('<int:pk>/', CVRetrieveDestroyView.as_view(), name='cv-detail'),
-    path('by-email/', CVByEmailView.as_view(), name='cv-by-email'),
+    path('by-email/', CVByEmailPostView.as_view(), name='cv-by-email'),
+    path('last-by-email/', LastCVByEmailPostView.as_view(), name='cv-last-by-email'),
 ]
