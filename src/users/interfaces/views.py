@@ -1,8 +1,10 @@
-from rest_framework import generics, status
+from django.db import IntegrityError
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
+
 from users.infrastructure.models import User
 from users.interfaces.serializers import (
     UserSerializer,
@@ -27,9 +29,26 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            token, _ = Token.objects.get_or_create(user=user)
-            return Response({'token': token.key}, status=status.HTTP_201_CREATED)
+            try:
+                user = serializer.save()
+                token, _ = Token.objects.get_or_create(user=user)
+                return Response({'token': token.key}, status=status.HTTP_201_CREATED)
+            except IntegrityError as e:
+                err = str(e).lower()
+                if 'username' in err:
+                    return Response(
+                        {'username': ['A user with that username already exists.']},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                if 'email' in err:
+                    return Response(
+                        {'email': ['A user with that email already exists.']},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                return Response(
+                    {'detail': 'Could not create user due to database error.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
