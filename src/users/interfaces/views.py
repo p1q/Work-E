@@ -17,6 +17,21 @@ class UserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    def create(self, request, *args, **kwargs):
+        username = request.data.get('username')
+        email = request.data.get('email')
+
+        errors = {}
+        if username and User.objects.filter(username__iexact=username).exists():
+            errors['username'] = ['A user with that username already exists.']
+        if email and User.objects.filter(email__iexact=email).exists():
+            errors['email'] = ['A user with that email already exists.']
+
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return super().create(request, *args, **kwargs)
+
 
 class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
