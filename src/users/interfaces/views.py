@@ -46,7 +46,7 @@ class RegisterView(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 return Response(
-                    {'detail': 'Could not create this user due to database error.'},
+                    {'detail': 'Could not create user due to database error.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
