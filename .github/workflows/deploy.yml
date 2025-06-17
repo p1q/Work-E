@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build & Package Docker Image
+    name: Build & Upload Docker Image
     runs-on: ubuntu-latest
     env:
       DOCKER_BUILDKIT: 1
@@ -28,47 +28,36 @@ jobs:
       - name: Save Docker image to tarball
         run: docker save django-work-e -o django-work-e.tar
 
-      - name: Upload Docker image tarball
-        uses: actions/upload-artifact@v4
+      - name: Upload tarball to server via SCP
+        uses: appleboy/scp-action@v0.1.4
         with:
-          name: django-work-e-tar
-          path: django-work-e.tar
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT }}
+          source: "django-work-e.tar"
+          target: "~/deploy-artifacts/"
 
   deploy:
-    name: Deploy to Personal Server
+    name: Deploy from Server
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-      - name: Download Docker image tarball
-        uses: actions/download-artifact@v4
-        with:
-          name: django-work-e-tar
-          path: ./
-
-      - name: Copy Docker image to server
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: 212.111.205.125
-          username: ${{ secrets.SERVER_USERNAME }}
-          key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
-          port: 22
-          source: "django-work-e.tar"
-          target: "~/django-work-e.tar"
-
-      - name: Deploy on server via SSH
+      - name: SSH to server and deploy
         uses: appleboy/ssh-action@v1
         with:
-          host: 212.111.205.125
+          host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_SSH_PORT }}
           script: |
-            mkdir -p ~/cv-files
+            cd ~/deploy-artifacts
 
             docker ps -aq | xargs -r docker rm -f
             docker images -q | xargs -r docker rmi -f
 
-            docker load -i ~/django-work-e.tar/django-work-e.tar
+            docker load -i django-work-e.tar
 
             cat > ~/dev.env << 'EOF'
             DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
