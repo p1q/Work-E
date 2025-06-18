@@ -76,6 +76,10 @@ jobs:
 
             CV_FILES_PATH=${{ secrets.CV_FILES_PATH }}
             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            LINKEDIN_CLIENT_ID=${{ secrets.LINKEDIN_CLIENT_ID }}
+            LINKEDIN_CLIENT_SECRET=${{ secrets.LINKEDIN_CLIENT_SECRET }}
+            LINKEDIN_REDIRECT_URI=${{ secrets.LINKEDIN_REDIRECT_URI }}
             EOF
 
             docker run -d \
