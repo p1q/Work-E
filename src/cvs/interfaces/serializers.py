@@ -19,6 +19,8 @@ class CVSerializer(serializers.ModelSerializer):
     def validate_cv_file(self, file):
         if file.size == 0:
             raise serializers.ValidationError("File cannot be empty.")
+        if file.size > 1 * 1024 * 1024:
+            raise serializers.ValidationError("Maximum allowed file size is 1MB.")
         return file
 
     def create(self, validated_data):
