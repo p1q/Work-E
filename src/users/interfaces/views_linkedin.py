@@ -1,6 +1,7 @@
 import logging
 from django.conf import settings
 from django.shortcuts import redirect
+from django.views import View
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 
