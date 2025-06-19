@@ -12,8 +12,8 @@ class CV(models.Model):
     )
     cv_file = models.FileField(
         upload_to='cv-files/',
-        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'rtf'])],
-        help_text='Upload your CV (pdf, doc, docx, rtf)'
+        validators=[FileExtensionValidator(allowed_extensions=['pdf'])],
+        help_text='Upload your CV (PDF only)'
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
 

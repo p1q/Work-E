@@ -26,22 +26,14 @@ class CVSerializer(serializers.ModelSerializer):
 
         # Step 2: extension check
         ext = os.path.splitext(file.name)[1].lower()
-        valid_extensions = ['.pdf', '.doc', '.docx', '.rtf']
-        if ext not in valid_extensions:
-            raise serializers.ValidationError(f"Unsupported file extension: {ext}")
+        if ext != '.pdf':
+            raise serializers.ValidationError(f"Only PDF files are allowed.")
 
-        # Step 3: content verification
+        # Step 3: PDF content validation
         try:
-            if ext == '.pdf':
-                self._validate_pdf(file)
-            elif ext == '.docx':
-                self._validate_docx(file)
-            elif ext == '.doc':
-                self._validate_doc(file)
-            elif ext == '.rtf':
-                self._validate_rtf(file)
+            self._validate_pdf(file)
         except Exception:
-            raise serializers.ValidationError("File content does not match declared type or is corrupted.")
+            raise serializers.ValidationError("Invalid or corrupted PDF file.")
 
         return file
 
@@ -49,32 +41,13 @@ class CVSerializer(serializers.ModelSerializer):
         from PyPDF2 import PdfReader
         file.seek(0)
         reader = PdfReader(file)
+
         if not reader.pages:
             raise ValueError("Empty PDF file")
-        file.seek(0)
 
-    def _validate_docx(self, file):
-        import zipfile
-        file.seek(0)
-        if not zipfile.is_zipfile(file):
-            raise ValueError("Not a valid .docx file")
-        with zipfile.ZipFile(file) as docx_zip:
-            if 'word/document.xml' not in docx_zip.namelist():
-                raise ValueError("Missing content in .docx")
-        file.seek(0)
+        if reader.trailer.get("/Root", {}).get("/Names", {}).get("/EmbeddedFiles"):
+            raise ValueError("PDF contains embedded files")
 
-    def _validate_doc(self, file):
-        file.seek(0)
-        header = file.read(8)
-        if not header.startswith(b'\xD0\xCF\x11\xE0'):
-            raise ValueError("Not a valid .doc file")
-        file.seek(0)
-
-    def _validate_rtf(self, file):
-        file.seek(0)
-        header = file.read(10)
-        if not header.lstrip().startswith(b'{\\rtf'):
-            raise ValueError("Not a valid RTF file")
         file.seek(0)
 
     def create(self, validated_data):
