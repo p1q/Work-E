@@ -23,7 +23,12 @@ class User(AbstractUser):
     last_name = models.CharField(_('last name'), max_length=30, blank=True)
 
     google_id = models.CharField(_('Google ID'), max_length=255, unique=True, null=True, blank=True)
-    avatar_url = models.URLField(_('Avatar URL'), blank=True, null=True)
+    avatar_url = models.URLField(
+        _('Avatar URL'),
+        max_length=1000,
+        blank=True,
+        null=True
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
