@@ -2,12 +2,14 @@ import os
 import base64
 import hashlib
 import secrets
+import logging
 from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
 from users.infrastructure.models import User
-from .views_auth import AuthService
+
+logger = logging.getLogger(__name__)
 
 
 class LinkedInOAuthService:
@@ -45,42 +47,61 @@ class LinkedInOAuthService:
         incoming = request.GET.get("state")
         stored = request.session.get("linkedin_oauth_state")
         verifier = request.session.get("linkedin_code_verifier")
+
         if incoming != stored or not verifier:
             return None
+
+        request.session.pop("linkedin_oauth_state", None)
+        request.session.pop("linkedin_code_verifier", None)
         return verifier
 
     @classmethod
     def exchange_code_for_token(cls, code, verifier):
-        resp = requests.post(
-            cls.TOKEN_URL,
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": settings.LINKEDIN_REDIRECT_URI,
-                "client_id": settings.LINKEDIN_CLIENT_ID,
-                "client_secret": settings.LINKEDIN_CLIENT_SECRET,
-                "code_verifier": verifier,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        if not resp.ok:
+        try:
+            resp = requests.post(
+                cls.TOKEN_URL,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": settings.LINKEDIN_REDIRECT_URI,
+                    "client_id": settings.LINKEDIN_CLIENT_ID,
+                    "client_secret": settings.LINKEDIN_CLIENT_SECRET,
+                    "code_verifier": verifier,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=10,
+            )
+        except requests.RequestException as e:
+            logger.error("LinkedIn token exchange failed: %s", e)
             return None
+
+        if not resp.ok:
+            logger.warning(
+                "LinkedIn token exchange error: status=%s, body=%s",
+                resp.status_code,
+                resp.text,
+            )
+            return None
+
         return resp.json().get("access_token")
 
     @classmethod
     def fetch_userinfo_via_oidc(cls, access_token):
         headers = {"Authorization": f"Bearer {access_token}"}
-        resp = requests.get(cls.USERINFO_URL, headers=headers)
+        resp = requests.get(
+            cls.USERINFO_URL,
+            headers=headers,
+            timeout=10,
+        )
         resp.raise_for_status()
         info = resp.json()
 
-        email = (
-                info.get("email")
-                or info.get("email_verified")
-                or (info.get("emails") and info["emails"][0])
-        )
+        if not info.get("email_verified", False):
+            raise ValueError("Email not verified by LinkedIn")
+
+        email = info.get("email")
         if not email:
-            raise ValueError("Email not returned by LinkedIn OIDC")
+            raise ValueError("No email returned by LinkedIn OIDC")
 
         return {
             "email": email,
@@ -92,18 +113,36 @@ class LinkedInOAuthService:
 
     @staticmethod
     def get_or_create_user(user_data):
-        return User.objects.update_or_create(
-            email=user_data["email"],
-            defaults={
-                "username": user_data["email"].split("@")[0],
-                "first_name": user_data["first_name"],
-                "last_name": user_data["last_name"],
-                "avatar_url": user_data["avatar_url"],
-                "linkedin_id": user_data["linkedin_id"],
-            },
-        )[0]
+        """
+        Поиск по email case‑insensitive, учёт коллизий username.
+        """
+        email = user_data["email"]
+        base_username = email.split("@")[0]
+        username = base_username
 
-    @staticmethod
-    def cleanup_session(request):
-        request.session.pop("linkedin_oauth_state", None)
-        request.session.pop("linkedin_code_verifier", None)
+        existing = User.objects.filter(email__iexact=email).first()
+        defaults = {
+            "first_name": user_data["first_name"],
+            "last_name": user_data["last_name"],
+            "avatar_url": user_data["avatar_url"],
+            "linkedin_id": user_data["linkedin_id"],
+        }
+
+        if User.objects.filter(username__iexact=username).exists():
+            import uuid
+
+            suffix = uuid.uuid4().hex[:8]
+            username = f"{base_username}-{suffix}"
+
+        if existing:
+            existing.username = username
+            for field, value in defaults.items():
+                setattr(existing, field, value)
+            existing.save(update_fields=["username"] + list(defaults.keys()))
+            return existing
+        else:
+            return User.objects.create(
+                email=email,
+                username=username,
+                **defaults
+            )

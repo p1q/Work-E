@@ -1,11 +1,13 @@
+import logging
 from django.conf import settings
 from django.shortcuts import redirect
-from django.views import View
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 
 from .linkedin_oauth import LinkedInOAuthService
 from shared.auth.service import AuthService
+
+logger = logging.getLogger(__name__)
 
 
 class LinkedInLoginView(View):
@@ -28,23 +30,27 @@ class LinkedInCallbackView(APIView):
 
         verifier = LinkedInOAuthService.validate_state_and_get_verifier(request)
         if not verifier:
-            return redirect(f"{front}/sign-up?error=auth_failed")
+            logger.warning("LinkedIn OAuth failed: invalid state")
+            return redirect(f"{front}/sign-up?error=invalid_state")
 
         token = LinkedInOAuthService.exchange_code_for_token(code, verifier)
         if not token:
+            logger.error("LinkedIn OAuth failed: token exchange error")
             return redirect(f"{front}/sign-up?error=token_failed")
 
         try:
             user_info = LinkedInOAuthService.fetch_userinfo_via_oidc(token)
-        except ValueError:
-            return redirect(f"{front}/sign-up?error=no_email")
+        except ValueError as e:
+            logger.error("LinkedIn OAuth failed fetching userinfo: %s", e)
+            msg = str(e)
+            if "verified" in msg:
+                return redirect(f"{front}/sign-up?error=email_not_verified")
+            return redirect(f"{front}/sign-up?error=no_email_returned")
 
         user = LinkedInOAuthService.get_or_create_user(user_info)
-
         tokens = AuthService.create_jwt_for_user(user)
 
         resp = redirect(f"{front}/")
         AuthService.attach_jwt_cookies(resp, tokens)
 
-        LinkedInOAuthService.cleanup_session(request)
         return resp
