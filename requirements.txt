@@ -7,3 +7,4 @@ drf-spectacular-sidecar
 django-cors-headers>=4.0.0
 google-auth
 requests
+PyPDF2>=3.0.0
