@@ -18,16 +18,19 @@ class CVSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user', 'filename', 'uploaded_at']
 
     def validate_cv_file(self, file):
+        # Step 1: size checks
         if file.size == 0:
             raise serializers.ValidationError("File cannot be empty.")
         if file.size > 1 * 1024 * 1024:
             raise serializers.ValidationError("Maximum allowed file size is 1MB.")
 
+        # Step 2: extension check
         ext = os.path.splitext(file.name)[1].lower()
         valid_extensions = ['.pdf', '.doc', '.docx', '.rtf']
         if ext not in valid_extensions:
             raise serializers.ValidationError(f"Unsupported file extension: {ext}")
 
+        # Step 3: content verification
         try:
             if ext == '.pdf':
                 self._validate_pdf(file)
