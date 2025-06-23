@@ -2,6 +2,8 @@ import os
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from cvs.models import CV
+from PyPDF2 import PdfReader
+from PyPDF2.errors import PdfReadError
 
 User = get_user_model()
 
@@ -27,28 +29,41 @@ class CVSerializer(serializers.ModelSerializer):
         # Step 2: extension check
         ext = os.path.splitext(file.name)[1].lower()
         if ext != '.pdf':
-            raise serializers.ValidationError(f"Only PDF files are allowed.")
+            raise serializers.ValidationError("Only PDF files are allowed.")
 
         # Step 3: PDF content validation
         try:
             self._validate_pdf(file)
+        except serializers.ValidationError:
+            # пробрасываем уже готовое сообщение
+            raise
         except Exception:
             raise serializers.ValidationError("Invalid or corrupted PDF file.")
 
         return file
 
     def _validate_pdf(self, file):
-        from PyPDF2 import PdfReader
         file.seek(0)
-        reader = PdfReader(file)
+        try:
+            reader = PdfReader(file)
+        except PdfReadError:
+            raise serializers.ValidationError("Invalid or corrupted PDF file.")
 
-        if not reader.pages:
-            raise ValueError("Empty PDF file")
+        # Проверка на пустой PDF
+        if not getattr(reader, 'pages', None):
+            raise serializers.ValidationError("Empty PDF file.")
 
-        if reader.trailer.get("/Root", {}).get("/Names", {}).get("/EmbeddedFiles"):
-            raise ValueError("PDF contains embedded files")
-
-        file.seek(0)
+        # Проверка на EmbeddedFiles
+        try:
+            root = reader.trailer["/Root"]
+            names = root.get("/Names")
+            if names and names.get("/EmbeddedFiles"):
+                raise serializers.ValidationError("PDF contains embedded files.")
+        except Exception:
+            # Игнорируем любые непредвиденные структуры
+            pass
+        finally:
+            file.seek(0)
 
     def create(self, validated_data):
         email = validated_data.pop('email')
@@ -56,6 +71,6 @@ class CVSerializer(serializers.ModelSerializer):
             user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             raise serializers.ValidationError({
-                'email': f'User with email \"{email}\" not found.'
+                'email': f'User with email "{email}" not found.'
             })
         return CV.objects.create(user=user, **validated_data)
