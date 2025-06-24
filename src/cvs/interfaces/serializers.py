@@ -1,9 +1,11 @@
 import os
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from cvs.models import CV
+
 from PyPDF2 import PdfReader
 from PyPDF2.errors import PdfReadError
+from cvs.models import CV
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from rest_framework import serializers
 
 User = get_user_model()
 
