@@ -23,8 +23,9 @@ class CVSerializer(serializers.ModelSerializer):
         # Step 1: size checks
         if file.size == 0:
             raise serializers.ValidationError("File cannot be empty.")
-        if file.size > 1 * 1024 * 1024:
-            raise serializers.ValidationError("Maximum allowed file size is 1MB.")
+        if file.size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
+            max_mb = settings.FILE_UPLOAD_MAX_MEMORY_SIZE // (1024 * 1024)
+            raise serializers.ValidationError(f"Maximum allowed file size is {max_mb}MB.")
 
         # Step 2: extension check
         ext = os.path.splitext(file.name)[1].lower()
