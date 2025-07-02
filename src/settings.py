@@ -30,6 +30,8 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
 
     'rest_framework_simplejwt.token_blacklist',
+    
+    'src.language',
 
     'users',
     'cvs',

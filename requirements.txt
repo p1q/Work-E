@@ -9,3 +9,4 @@ google-auth
 requests
 PyPDF2>=3.0.0
 djangorestframework-simplejwt
+langid
