@@ -13,7 +13,9 @@ load_dotenv(local_env if local_env.exists() else prod_env)
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'x&1%nq8g2b@3z!u$r@2@u^=l=d^9cv=h35=#zr1=y3%3hx*wuk')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -30,11 +32,12 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
 
     'rest_framework_simplejwt.token_blacklist',
-    
+
     'src.language',
 
     'users',
     'cvs',
+    'chatgpt',
 ]
 
 MIDDLEWARE = [

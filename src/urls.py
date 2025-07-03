@@ -12,9 +12,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('api/users/', include('users.interfaces.urls')),
-
     path('api/cvs/', include('cvs.interfaces.urls')),
     path('api/language/', include('language.urls')),
+    path('api/chatgpt/', include('chatgpt.interfaces.urls')),
 
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
