@@ -1,5 +1,4 @@
 import logging
-from django.conf import settings
 from django.shortcuts import redirect
 from django.views import View
 from rest_framework.views import APIView
@@ -24,7 +23,10 @@ class LinkedInCallbackView(APIView):
     def get(self, request):
         error = request.GET.get("error")
         code = request.GET.get("code")
-        front = settings.FRONTEND_URL
+
+        scheme = "https" if request.is_secure() else "http"
+        host = request.get_host()
+        front = f"{scheme}://{host}"
 
         if error or not code:
             return redirect(f"{front}/sign-up?error=auth_failed")
