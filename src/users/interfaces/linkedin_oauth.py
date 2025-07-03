@@ -30,11 +30,11 @@ class LinkedInOAuthService:
         return state, code_challenge
 
     @classmethod
-    def build_authorization_url(cls, state, code_challenge):
+    def build_authorization_url(cls, state, code_challenge, redirect_uri):
         params = {
             "response_type": "code",
             "client_id": settings.LINKEDIN_CLIENT_ID,
-            "redirect_uri": settings.LINKEDIN_REDIRECT_URI,
+            "redirect_uri": redirect_uri,
             "state": state,
             "scope": "openid profile email",
             "code_challenge": code_challenge,
@@ -56,14 +56,14 @@ class LinkedInOAuthService:
         return verifier
 
     @classmethod
-    def exchange_code_for_token(cls, code, verifier):
+    def exchange_code_for_token(cls, code, verifier, redirect_uri):
         try:
             resp = requests.post(
                 cls.TOKEN_URL,
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
-                    "redirect_uri": settings.LINKEDIN_REDIRECT_URI,
+                    "redirect_uri": redirect_uri,
                     "client_id": settings.LINKEDIN_CLIENT_ID,
                     "client_secret": settings.LINKEDIN_CLIENT_SECRET,
                     "code_verifier": verifier,
@@ -113,9 +113,6 @@ class LinkedInOAuthService:
 
     @staticmethod
     def get_or_create_user(user_data):
-        """
-        Поиск по email case‑insensitive, учёт коллизий username.
-        """
         email = user_data["email"]
         base_username = email.split("@")[0]
         username = base_username
@@ -130,7 +127,6 @@ class LinkedInOAuthService:
 
         if User.objects.filter(username__iexact=username).exists():
             import uuid
-
             suffix = uuid.uuid4().hex[:8]
             username = f"{base_username}-{suffix}"
 

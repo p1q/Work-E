@@ -13,7 +13,12 @@ logger = logging.getLogger(__name__)
 class LinkedInLoginView(View):
     def get(self, request):
         state, challenge = LinkedInOAuthService.generate_pkce_and_state(request)
-        url = LinkedInOAuthService.build_authorization_url(state, challenge)
+
+        scheme = "https" if request.is_secure() else "http"
+        host = request.get_host()
+        redirect_uri = f"{scheme}://{host}/api/users/linkedin/callback/"
+
+        url = LinkedInOAuthService.build_authorization_url(state, challenge, redirect_uri)
         return redirect(url)
 
 
@@ -26,6 +31,8 @@ class LinkedInCallbackView(APIView):
 
         scheme = "https" if request.is_secure() else "http"
         host = request.get_host()
+        redirect_uri = f"{scheme}://{host}/api/users/linkedin/callback/"
+
         front = f"{scheme}://{host}"
 
         if error or not code:
@@ -36,7 +43,7 @@ class LinkedInCallbackView(APIView):
             logger.warning("LinkedIn OAuth failed: invalid state")
             return redirect(f"{front}/sign-up?error=invalid_state")
 
-        token = LinkedInOAuthService.exchange_code_for_token(code, verifier)
+        token = LinkedInOAuthService.exchange_code_for_token(code, verifier, redirect_uri)
         if not token:
             logger.error("LinkedIn OAuth failed: token exchange error")
             return redirect(f"{front}/sign-up?error=token_failed")
@@ -55,5 +62,4 @@ class LinkedInCallbackView(APIView):
 
         resp = redirect(f"{front}/")
         AuthService.attach_jwt_cookies(resp, tokens)
-
         return resp
