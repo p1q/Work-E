@@ -38,10 +38,11 @@ class CVSerializer(serializers.ModelSerializer):
         try:
             self._validate_pdf(file)
         except serializers.ValidationError:
-            # пробрасываем уже готовое сообщение
             raise
         except Exception:
             raise serializers.ValidationError("Invalid or corrupted PDF file.")
+        finally:
+            file.seek(0)
 
         return file
 
@@ -52,18 +53,20 @@ class CVSerializer(serializers.ModelSerializer):
         except PdfReadError:
             raise serializers.ValidationError("Invalid or corrupted PDF file.")
 
-        # Проверка на пустой PDF
+        # Checking for an empty PDF
         if not getattr(reader, 'pages', None):
             raise serializers.ValidationError("Empty PDF file.")
 
-        # Проверка на EmbeddedFiles
+        # Checking for EmbeddedFiles
         try:
-            root = reader.trailer["/Root"]
-            names = root.get("/Names")
-            if names and names.get("/EmbeddedFiles"):
-                raise serializers.ValidationError("PDF contains embedded files.")
+            root = reader.trailer.get("/Root", {})
+            names = root.get("/Names", {})
+            embedded_files_tree = names.get("/EmbeddedFiles")
+
+            if embedded_files_tree:
+                if embedded_files_tree.get("/Names"):
+                    raise serializers.ValidationError("PDF contains embedded files.")
         except Exception:
-            # Игнорируем любые непредвиденные структуры
             pass
         finally:
             file.seek(0)
