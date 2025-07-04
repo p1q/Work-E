@@ -14,12 +14,17 @@ class LinkedInLoginView(View):
     def get(self, request):
         state, challenge = LinkedInOAuthService.generate_pkce_and_state(request)
 
-        scheme = "https" if request.is_secure() else "http"
-        host = request.get_host()
-        redirect_uri = f"{scheme}://{host}/api/users/linkedin/callback/"
+        origin = request.headers.get("Origin") or request.headers.get("Referer")
+        if not origin:
+            scheme = "https" if request.is_secure() else "http"
+            origin = f"{scheme}://{request.get_host()}"
 
-        url = LinkedInOAuthService.build_authorization_url(state, challenge, redirect_uri)
-        return redirect(url)
+        origin = origin.rstrip("/").split("/api")[0]
+
+        redirect_uri = f"{origin}/api/users/linkedin/callback/"
+        authorization_url = LinkedInOAuthService.build_authorization_url(state, challenge, redirect_uri)
+
+        return redirect(authorization_url)
 
 
 class LinkedInCallbackView(APIView):
@@ -29,11 +34,14 @@ class LinkedInCallbackView(APIView):
         error = request.GET.get("error")
         code = request.GET.get("code")
 
-        scheme = "https" if request.is_secure() else "http"
-        host = request.get_host()
-        redirect_uri = f"{scheme}://{host}/api/users/linkedin/callback/"
+        origin = request.headers.get("Origin") or request.headers.get("Referer")
+        if not origin:
+            scheme = "https" if request.is_secure() else "http"
+            origin = f"{scheme}://{request.get_host()}"
+        origin = origin.rstrip("/").split("/api")[0]
 
-        front = f"{scheme}://{host}"
+        redirect_uri = f"{origin}/api/users/linkedin/callback/"
+        front = origin
 
         if error or not code:
             return redirect(f"{front}/sign-up?error=auth_failed")
