@@ -8,7 +8,6 @@ from shared.auth.service import AuthService
 
 logger = logging.getLogger(__name__)
 
-
 class LinkedInLoginView(View):
     def get(self, request):
         state, challenge = LinkedInOAuthService.generate_pkce_and_state(request)
@@ -16,11 +15,12 @@ class LinkedInLoginView(View):
         if not origin:
             scheme = "https" if request.is_secure() else "http"
             origin = f"{scheme}://{request.get_host()}"
-        origin = origin.rstrip("/").split("/api")[0]
+        # Убираем все части пути, относящиеся к статическим файлам
+        origin = origin.split('/static')[0]
         redirect_uri = f"{origin}/api/users/linkedin/callback/"
+        print(f"Redirect URI: {redirect_uri}")  # Выводим ссылку в консоль
         authorization_url = LinkedInOAuthService.build_authorization_url(state, challenge, redirect_uri)
         return redirect(authorization_url)
-
 
 class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
@@ -35,6 +35,7 @@ class LinkedInCallbackView(APIView):
             logger.warning("LinkedIn OAuth failed: invalid state")
             return redirect(self._fixed_callback_url() + "?error=invalid_state")
         dynamic_redirect_uri = self._dynamic_callback_url(request)
+        print(f"Dynamic Redirect URI: {dynamic_redirect_uri}")  # Выводим ссылку в консоль
         token = LinkedInOAuthService.exchange_code_for_token(code, verifier, dynamic_redirect_uri)
         if not token:
             logger.error("LinkedIn OAuth failed: token exchange error")
@@ -57,5 +58,4 @@ class LinkedInCallbackView(APIView):
         if not origin:
             scheme = "https" if request.is_secure() else "http"
             origin = f"{scheme}://{request.get_host()}"
-        origin = origin.rstrip("/").split("/api")[0]
         return f"{origin}/api/users/linkedin/callback/"
