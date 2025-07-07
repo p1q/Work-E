@@ -8,25 +8,19 @@ from shared.auth.service import AuthService
 
 logger = logging.getLogger(__name__)
 
+
 class LinkedInLoginView(View):
     def get(self, request):
         state, challenge = LinkedInOAuthService.generate_pkce_and_state(request)
-
-        # Получаем домен из заголовков запроса (origin или referer), если нет — генерируем сам
         origin = request.headers.get("Origin") or request.headers.get("Referer")
         if not origin:
             scheme = "https" if request.is_secure() else "http"
             origin = f"{scheme}://{request.get_host()}"
-
-        # Убедитесь, что URL указывает на правильный домен без добавления лишних путей
         origin = origin.rstrip("/").split("/api")[0]
-        redirect_uri = f"{origin}/api/users/linkedin/callback/"  # Без /static/
-
-        # Генерация и редирект с корректным URL
-        authorization_url = LinkedInOAuthService.build_authorization_url(
-            state, challenge, redirect_uri
-        )
+        redirect_uri = f"{origin}/api/users/linkedin/callback/"
+        authorization_url = LinkedInOAuthService.build_authorization_url(state, challenge, redirect_uri)
         return redirect(authorization_url)
+
 
 class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
@@ -34,35 +28,26 @@ class LinkedInCallbackView(APIView):
     def get(self, request):
         error = request.GET.get("error")
         code = request.GET.get("code")
-
-        # Проверка на ошибки
         if error or not code:
             return redirect(self._fixed_callback_url() + "?error=auth_failed")
-
-        # Проверка и обмен кода на токен
         verifier = LinkedInOAuthService.validate_state_and_get_verifier(request)
         if not verifier:
             logger.warning("LinkedIn OAuth failed: invalid state")
             return redirect(self._fixed_callback_url() + "?error=invalid_state")
-
         dynamic_redirect_uri = self._dynamic_callback_url(request)
         token = LinkedInOAuthService.exchange_code_for_token(code, verifier, dynamic_redirect_uri)
         if not token:
             logger.error("LinkedIn OAuth failed: token exchange error")
             return redirect(self._fixed_callback_url() + "?error=token_failed")
-
         try:
             user_info = LinkedInOAuthService.fetch_userinfo_via_oidc(token)
         except ValueError as e:
             msg = str(e)
             err = "email_not_verified" if "verified" in msg else "no_email_returned"
             return redirect(self._fixed_callback_url() + f"?error={err}")
-
         user = LinkedInOAuthService.get_or_create_user(user_info)
         tokens = AuthService.create_jwt_for_user(user)
-
-        # Финальный редирект с установкой JWT cookies
-        resp = redirect(self._fixed_callback_url())  # ← фиксированный редирект
+        resp = redirect(self._fixed_callback_url())
         AuthService.attach_jwt_cookies(resp, tokens)
         return resp
 
@@ -74,8 +59,3 @@ class LinkedInCallbackView(APIView):
             origin = f"{scheme}://{request.get_host()}"
         origin = origin.rstrip("/").split("/api")[0]
         return f"{origin}/api/users/linkedin/callback/"
-
-    @staticmethod
-    def _fixed_callback_url() -> str:
-        # Это финальный редирект, и он остается без изменений
-        return "https://wq.work.gd/api/users/linkedin/callback/"
