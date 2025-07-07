@@ -12,6 +12,7 @@ from .linkedin_oauth import LinkedInOAuthService
 
 logger = logging.getLogger(__name__)
 
+
 class LinkedInLoginView(View):
     def get(self, request):
         # --- Step 1: Compute base frontend URL ---
@@ -71,8 +72,7 @@ class LinkedInCallbackView(APIView):
             return redirect(self._fixed_callback_url(frontend_base_url) + "?error=invalid_state")
 
         # Reconstruct the exact redirect URI used in the authorization step
-        dynamic_redirect_uri = self._dynamic_callback_url(request, frontend_base_url)
-        print(f"Dynamic Redirect URI: {dynamic_redirect_uri}")  # For debugging
+        dynamic_redirect_uri = self._dynamic_callback_url(frontend_base_url)
 
         # --- Step 8: Backend -> LinkedIn: POST /oauth/v2/accessToken to exchange code for access token ---
         token = LinkedInOAuthService.exchange_code_for_token(
@@ -112,4 +112,21 @@ class LinkedInCallbackView(APIView):
             scheme = "https" if request.is_secure() else "http"
             origin = f"{scheme}://{request.get_host()}"
 
-        #
+        # Разбираем URL и получаем только схему и хост
+        parsed_url = urlparse(origin)
+        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        return base_url
+
+    def _dynamic_callback_url(self, frontend_base_url):
+        """
+        Reconstructs the same callback URL used to initiate the OAuth flow,
+        needed for token exchange.
+        """
+        return f"{frontend_base_url}/api/users/linkedin/callback/"
+
+    @staticmethod
+    def _fixed_callback_url(frontend_base_url) -> str:
+        """
+        Fixed frontend URL to redirect back to, e.g. your SPA landing page.
+        """
+        return f"{frontend_base_url}/linkedin/callback/"

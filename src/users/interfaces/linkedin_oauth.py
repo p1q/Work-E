@@ -6,6 +6,7 @@ import logging
 from urllib.parse import urlencode
 
 import requests
+from requests.auth import HTTPBasicAuth
 from django.conf import settings
 from users.infrastructure.models import User
 
@@ -57,33 +58,46 @@ class LinkedInOAuthService:
 
     @classmethod
     def exchange_code_for_token(cls, code, verifier, redirect_uri):
+        """
+        Обменивает authorization code на access token.
+        Одновременный Body + HTTP BasicAuth для надёжности.
+        """
+        payload = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "code_verifier": verifier,
+            "client_id": settings.LINKEDIN_CLIENT_ID,
+            "client_secret": settings.LINKEDIN_CLIENT_SECRET,
+        }
+        logger.debug("LinkedIn.exchange_code_for_token payload: %s", payload)
+
         try:
             resp = requests.post(
                 cls.TOKEN_URL,
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": redirect_uri,
-                    "client_id": settings.LINKEDIN_CLIENT_ID,
-                    "client_secret": settings.LINKEDIN_CLIENT_SECRET,
-                    "code_verifier": verifier,
-                },
+                data=payload,
+                auth=HTTPBasicAuth(
+                    settings.LINKEDIN_CLIENT_ID,
+                    settings.LINKEDIN_CLIENT_SECRET
+                ),
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 timeout=10,
             )
         except requests.RequestException as e:
-            logger.error("LinkedIn token exchange failed: %s", e)
+            logger.error("LinkedIn token exchange failed (exception): %s", e)
             return None
+
+        logger.debug(
+            "LinkedIn token exchange response: status=%s, body=%s",
+            resp.status_code, resp.text
+        )
 
         if not resp.ok:
-            logger.warning(
-                "LinkedIn token exchange error: status=%s, body=%s",
-                resp.status_code,
-                resp.text,
-            )
+            # При не-200 сразу возвращаем None и дальше редирект с error=token_failed
             return None
 
-        return resp.json().get("access_token")
+        data = resp.json()
+        return data.get("access_token")
 
     @classmethod
     def fetch_userinfo_via_oidc(cls, access_token):
