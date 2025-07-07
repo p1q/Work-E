@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.shortcuts import redirect
@@ -11,11 +12,9 @@ from .linkedin_oauth import LinkedInOAuthService
 
 logger = logging.getLogger(__name__)
 
-
 class LinkedInLoginView(View):
     def get(self, request):
         # --- Step 1: Compute base frontend URL ---
-        # Calculate the base URL for the frontend, this will be used throughout the flow
         frontend_base_url = self._get_frontend_base_url(request)
 
         # --- Step 2: Frontend -> Backend: GET /api/users/linkedin/login/ ---
@@ -33,14 +32,19 @@ class LinkedInLoginView(View):
 
     def _get_frontend_base_url(self, request):
         """
-        Computes and returns the base URL for the frontend (origin URL).
+        Computes and returns the base URL for the frontend (origin URL), without any paths.
         This URL is used throughout the OAuth process.
         """
+        # Get the origin from headers or build it using scheme and host
         origin = request.headers.get("Origin") or request.headers.get("Referer")
         if not origin:
             scheme = "https" if request.is_secure() else "http"
             origin = f"{scheme}://{request.get_host()}"
-        return origin
+
+        # Разбираем URL и получаем только схему и хост
+        parsed_url = urlparse(origin)
+        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        return base_url
 
 
 class LinkedInCallbackView(APIView):
@@ -99,27 +103,13 @@ class LinkedInCallbackView(APIView):
 
     def _get_frontend_base_url(self, request):
         """
-        Computes and returns the base URL for the frontend (origin URL).
+        Computes and returns the base URL for the frontend (origin URL), without any paths.
         This URL is used throughout the OAuth process.
         """
+        # Get the origin from headers or build it using scheme and host
         origin = request.headers.get("Origin") or request.headers.get("Referer")
         if not origin:
             scheme = "https" if request.is_secure() else "http"
             origin = f"{scheme}://{request.get_host()}"
-        return origin
 
-    @staticmethod
-    def _fixed_callback_url(frontend_base_url) -> str:
-        """
-        Fixed frontend URL to redirect back to, e.g. your SPA landing page.
-        """
-        # You might want to configure this via settings or environment variable
-        return f"{frontend_base_url}/linkedin/callback/"
-
-    @staticmethod
-    def _dynamic_callback_url(request, frontend_base_url) -> str:
-        """
-        Reconstructs the same callback URL used to initiate the OAuth flow,
-        needed for token exchange.
-        """
-        return f"{frontend_base_url}/api/users/linkedin/callback/"
+        #
