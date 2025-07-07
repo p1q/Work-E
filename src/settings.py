@@ -17,6 +17,8 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
