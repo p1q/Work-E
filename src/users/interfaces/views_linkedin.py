@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.shortcuts import redirect
 from django.views import View
 from rest_framework.permissions import AllowAny
@@ -9,6 +10,7 @@ from shared.auth.service import AuthService
 from .linkedin_oauth import LinkedInOAuthService
 
 logger = logging.getLogger(__name__)
+
 
 class LinkedInLoginView(View):
     def get(self, request):
@@ -47,6 +49,9 @@ class LinkedInCallbackView(APIView):
     def get(self, request):
         # --- Step 1: Compute base frontend URL ---
         frontend_base_url = self._get_frontend_base_url(request)
+
+        # Get BACKEND_BASE_URL from environment
+        backend_base_url = settings.BACKEND_BASE_URL
 
         # --- Step 5: LinkedIn -> Backend: GET /api/users/linkedin/callback?code=...&state=... ---
         error = request.GET.get("error")
