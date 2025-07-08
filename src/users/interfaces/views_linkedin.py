@@ -1,3 +1,5 @@
+# src/users/interfaces/views_linkedin.py
+
 import logging
 from urllib.parse import urlparse
 
@@ -6,30 +8,26 @@ from django.shortcuts import redirect
 from django.views import View
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 
 from .linkedin_oauth import LinkedInOAuthService
 
 logger = logging.getLogger(__name__)
 
+
 class LinkedInLoginView(View):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # 1) вычисляем базовый фронтенд-URL
         frontend_base_url = self._get_frontend_base_url(request)
 
-        # 2) генерируем state (PKCE больше не нужен)
         state, _ = LinkedInOAuthService.generate_pkce_and_state(request)
-
-        # 3) собираем точный redirect_uri
         redirect_uri = f"{frontend_base_url}/api/users/linkedin/callback/"
-
-        # Сохраняем его в сессии, чтобы потом использовать именно тот же при обмене
         request.session["linkedin_redirect_uri"] = redirect_uri
 
-        # 4) строим URL авторизации LinkedIn и редиректим
         authorization_url = LinkedInOAuthService.build_authorization_url(
-            state, None, redirect_uri  # PKCE не передается
+            state, None, redirect_uri
         )
         return redirect(authorization_url)
 
@@ -41,31 +39,49 @@ class LinkedInLoginView(View):
         parsed = urlparse(origin)
         return f"{parsed.scheme}://{parsed.netloc}"
 
+
 class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        frontend_base_url = self._get_frontend_base_url(request)
+        # Если фронтенд редиректит сюда с флагом успеха — возвращаем JSON
+        if request.GET.get("logged_in") == "true":
+            return Response(
+                {"logged_in": True},
+                status=status.HTTP_200_OK
+            )
 
+        # Обработка callback от LinkedIn
         code = request.GET.get("code")
         error = request.GET.get("error")
-        if error or not code:
-            return redirect(f"{frontend_base_url}/linkedin/callback/?error=auth_failed")
 
-        # убираем проверку state и code_verifier
+        if error or not code:
+            return Response(
+                {"error": "auth_failed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         redirect_uri = request.session.pop("linkedin_redirect_uri", None)
         if not redirect_uri:
             logger.error("Missing redirect_uri in session")
-            return redirect(f"{frontend_base_url}/linkedin/callback/?error=server_error")
+            return Response(
+                {"error": "server_error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        # обмениваем код на токен
         token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
         if not token:
-            logger.error("LinkedIn OAuth failed: token exchange error")
-            return redirect(f"{frontend_base_url}/linkedin/callback/?error=token_failed")
+            logger.error("LinkedIn token exchange failed")
+            return Response(
+                {"error": "token_failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        # перенаправляем пользователя (токен может быть использован в дальнейшем для аутентификации)
-        return redirect(f"{frontend_base_url}/linkedin/callback/?logged_in=true")
+        # После успешного обмена — возвращаем JSON с признаком успеха и токеном
+        return Response(
+            {"logged_in": True, "access_token": token},
+            status=status.HTTP_200_OK
+        )
 
     def _get_frontend_base_url(self, request):
         origin = request.headers.get("Origin") or request.headers.get("Referer")
