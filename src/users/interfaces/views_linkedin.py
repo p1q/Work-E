@@ -1,15 +1,12 @@
-# src/users/interfaces/views_linkedin.py
-
 import logging
 from urllib.parse import urlparse
 
-from django.conf import settings
 from django.shortcuts import redirect
 from django.views import View
-from rest_framework.permissions import AllowAny
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .linkedin_oauth import LinkedInOAuthService
 
@@ -44,14 +41,12 @@ class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Если фронтенд редиректит сюда с флагом успеха — возвращаем JSON
         if request.GET.get("logged_in") == "true":
             return Response(
                 {"logged_in": True},
                 status=status.HTTP_200_OK
             )
 
-        # Обработка callback от LinkedIn
         code = request.GET.get("code")
         error = request.GET.get("error")
 
@@ -77,7 +72,6 @@ class LinkedInCallbackView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        # После успешного обмена — возвращаем JSON с признаком успеха и токеном
         return Response(
             {"logged_in": True, "access_token": token},
             status=status.HTTP_200_OK

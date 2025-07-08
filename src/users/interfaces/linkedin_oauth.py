@@ -1,8 +1,5 @@
-import os
-import base64
-import hashlib
-import secrets
 import logging
+import secrets
 from urllib.parse import urlencode
 
 import requests
@@ -18,22 +15,21 @@ class LinkedInOAuthService:
     def generate_pkce_and_state(request):
         state = secrets.token_urlsafe(16)
         request.session["linkedin_oauth_state"] = state
-        return state, None  # Убираем возвращение challenge и verifier
+        return state, None
 
     @classmethod
     def build_authorization_url(cls, state, code_challenge, redirect_uri):
         params = {
-            "response_type": "code",  # Получаем код авторизации
+            "response_type": "code",
             "client_id": settings.LINKEDIN_CLIENT_ID,
             "redirect_uri": redirect_uri,
             "state": state,
-            "scope": "openid profile email",  # Только для авторизации
+            "scope": "openid profile email",
         }
         return f"{cls.AUTHORIZATION_URL}?{urlencode(params)}"
 
     @staticmethod
     def validate_state_and_get_verifier(request):
-        # Этот метод теперь просто возвращает state без code_verifier
         incoming = request.GET.get("state")
         stored = request.session.get("linkedin_oauth_state")
 
@@ -41,14 +37,10 @@ class LinkedInOAuthService:
             return None
 
         request.session.pop("linkedin_oauth_state", None)
-        return None  # Не нужен code_verifier
+        return None
 
     @classmethod
     def exchange_code_for_token(cls, code, redirect_uri):
-        """
-        Обмениваем authorization code на access token.
-        Передаем grant_type, code, redirect_uri и client_id в теле.
-        """
         payload = {
             "grant_type": "authorization_code",
             "code": code,
@@ -76,4 +68,4 @@ class LinkedInOAuthService:
             return None
 
         data = resp.json()
-        return data.get("access_token")  # Возвращаем только access token
+        return data.get("access_token")
