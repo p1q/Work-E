@@ -1,6 +1,7 @@
 import logging
 from urllib.parse import urlparse
 
+import requests
 from django.shortcuts import redirect
 from django.views import View
 from rest_framework import status
@@ -43,19 +44,20 @@ class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        # Если короткий проверочный запрос от фронтенда
         if request.GET.get("logged_in") == "true":
             return Response({"logged_in": True}, status=status.HTTP_200_OK)
 
         code = request.GET.get("code")
         error = request.GET.get("error")
-
         if error or not code:
             return Response({"error": "auth_failed"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Попытка взять redirect_uri из сессии, иначе — строим по умолчанию
         redirect_uri = request.session.pop("linkedin_redirect_uri", None)
         if not redirect_uri:
-            logger.error("Missing redirect_uri in session")
-            return Response({"error": "server_error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.warning("redirect_uri missing in session, using default")
+            redirect_uri = f"{self._get_frontend_base_url(request)}/api/users/linkedin/callback/"
 
         token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
         if not token:
@@ -63,3 +65,61 @@ class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
             return Response({"error": "token_failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"logged_in": True, "access_token": token}, status=status.HTTP_200_OK)
+
+
+class LinkedInProfileView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        access_token = request.data.get('access_token')
+        if not access_token:
+            return Response(
+                {'error': 'Access token is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        headers = {'Authorization': f'Bearer {access_token}'}
+
+        # 1) Получаем базовый профиль
+        profile_url = (
+            'https://api.linkedin.com/v2/me'
+            '?projection=(id,localizedFirstName,localizedLastName,'
+            'profilePicture(displayImage~:playableStreams))'
+        )
+        try:
+            profile_resp = requests.get(profile_url, headers=headers, timeout=10)
+            profile_resp.raise_for_status()
+            profile_data = profile_resp.json()
+        except requests.RequestException as e:
+            logger.error('LinkedIn profile fetch failed: %s', e)
+            return Response(
+                {'error': 'Failed to fetch LinkedIn profile.'},
+                status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        # 2) Получаем email. Если не удалось получить email — продолжаем без него
+        email_url = (
+            'https://api.linkedin.com/v2/emailAddress'
+            '?q=members&projection=(elements*(handle~))'
+        )
+        email_address = None
+        try:
+            email_resp = requests.get(email_url, headers=headers, timeout=10)
+            email_resp.raise_for_status()
+            email_data = email_resp.json()
+            elements = email_data.get('elements', [])
+            if elements:
+                handle = elements[0].get('handle~', {})
+                email_address = handle.get('emailAddress')
+        except requests.RequestException as e:
+            logger.error('LinkedIn email fetch failed: %s', e)
+
+        # 3) Формируем ответ
+        response_data = {
+            'id': profile_data.get('id'),
+            'first_name': profile_data.get('localizedFirstName'),
+            'last_name': profile_data.get('localizedLastName'),
+            'email': email_address,
+            'profile': profile_data,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)

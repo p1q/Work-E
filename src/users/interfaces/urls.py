@@ -6,7 +6,11 @@ from users.interfaces.views import (
     LoginView,
 )
 from users.interfaces.views_google import GoogleLoginView
-from users.interfaces.views_linkedin import LinkedInLoginView, LinkedInCallbackView
+from users.interfaces.views_linkedin import (
+    LinkedInLoginView,
+    LinkedInCallbackView,
+    LinkedInProfileView,
+)
 
 urlpatterns = [
     path('', UserListCreateView.as_view(), name='user-list-create'),
@@ -16,4 +20,5 @@ urlpatterns = [
     path('google-login/', GoogleLoginView.as_view(), name='google-login'),
     path('linkedin/login/', LinkedInLoginView.as_view(), name='linkedin-login'),
     path('linkedin/callback/', LinkedInCallbackView.as_view(), name='linkedin-callback'),
+    path('linkedin/profile/', LinkedInProfileView.as_view(), name='linkedin-profile'),
 ]
