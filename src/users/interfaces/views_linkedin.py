@@ -44,7 +44,6 @@ class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Если короткий проверочный запрос от фронтенда
         if request.GET.get("logged_in") == "true":
             return Response({"logged_in": True}, status=status.HTTP_200_OK)
 
@@ -53,7 +52,6 @@ class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
         if error or not code:
             return Response({"error": "auth_failed"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Попытка взять redirect_uri из сессии, иначе — строим по умолчанию
         redirect_uri = request.session.pop("linkedin_redirect_uri", None)
         if not redirect_uri:
             logger.warning("redirect_uri missing in session, using default")
@@ -68,6 +66,12 @@ class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
 
 
 class LinkedInProfileView(APIView):
+    """
+    Новый эндпоинт:
+    POST /api/users/linkedin/profile/
+    Тело запроса: { "access_token": "<LinkedIn access token>" }
+    Возвращает основные данные профиля и email.
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -78,26 +82,33 @@ class LinkedInProfileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        headers = {'Authorization': f'Bearer {access_token}'}
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'X-Restli-Protocol-Version': '2.0.0',
+        }
 
-        # 1) Получаем базовый профиль
+        # 1) Получаем базовый профиль (минимальная проекция)
         profile_url = (
             'https://api.linkedin.com/v2/me'
-            '?projection=(id,localizedFirstName,localizedLastName,'
-            'profilePicture(displayImage~:playableStreams))'
+            '?projection=(id,localizedFirstName,localizedLastName)'
         )
         try:
             profile_resp = requests.get(profile_url, headers=headers, timeout=10)
-            profile_resp.raise_for_status()
             profile_data = profile_resp.json()
+            profile_resp.raise_for_status()
         except requests.RequestException as e:
-            logger.error('LinkedIn profile fetch failed: %s', e)
+            logger.error(
+                'LinkedIn profile fetch failed: status=%s, body=%s, error=%s',
+                getattr(profile_resp, 'status_code', None),
+                getattr(profile_resp, 'text', None),
+                e
+            )
             return Response(
-                {'error': 'Failed to fetch LinkedIn profile.'},
+                {'error': 'Failed to fetch LinkedIn profile.', 'details': getattr(profile_resp, 'text', str(e))},
                 status=status.HTTP_502_BAD_GATEWAY
             )
 
-        # 2) Получаем email. Если не удалось получить email — продолжаем без него
+        # 2) Получаем email
         email_url = (
             'https://api.linkedin.com/v2/emailAddress'
             '?q=members&projection=(elements*(handle~))'
@@ -105,14 +116,19 @@ class LinkedInProfileView(APIView):
         email_address = None
         try:
             email_resp = requests.get(email_url, headers=headers, timeout=10)
-            email_resp.raise_for_status()
             email_data = email_resp.json()
+            email_resp.raise_for_status()
             elements = email_data.get('elements', [])
             if elements:
                 handle = elements[0].get('handle~', {})
                 email_address = handle.get('emailAddress')
         except requests.RequestException as e:
-            logger.error('LinkedIn email fetch failed: %s', e)
+            logger.warning(
+                'LinkedIn email fetch failed: status=%s, body=%s, error=%s',
+                getattr(email_resp, 'status_code', None),
+                getattr(email_resp, 'text', None),
+                e
+            )
 
         # 3) Формируем ответ
         response_data = {
@@ -120,6 +136,6 @@ class LinkedInProfileView(APIView):
             'first_name': profile_data.get('localizedFirstName'),
             'last_name': profile_data.get('localizedLastName'),
             'email': email_address,
-            'profile': profile_data,
+            'profile_raw': profile_data,
         }
         return Response(response_data, status=status.HTTP_200_OK)
