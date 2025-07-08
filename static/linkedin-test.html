@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Тест: Увійти через LinkedIn</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    button, a.button {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      text-decoration: none;
+      background: #0077b5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover, a.button:hover {
+      background: #005983;
+    }
+    #message {
+      margin-top: 1.5rem;
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Тест: Увійти через LinkedIn</h1>
+
+  <button id="login-btn">Увійти через LinkedIn</button>
+
+  <div id="message"></div>
+
+  <script>
+    const BACKEND = 'https://127.0.0.1:8000';
+
+    // 1) При клике уходим на /api/users/linkedin/login/ бэкенда
+    document.getElementById('login-btn').addEventListener('click', () => {
+      window.location.href = `${BACKEND}/api/users/linkedin/login/`;
+    });
+
+    // 2) После редиректа из бэка, проверяем query-параметры и, если logged_in, запрашиваем профиль
+    document.addEventListener('DOMContentLoaded', async () => {
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get('error');
+      const loggedIn = params.get('logged_in');
+
+      if (error) {
+        // Показываем ошибку из бэка
+        document.getElementById('message').textContent =
+          'Помилка авторизації: ' + error;
+        return;
+      }
+
+      if (loggedIn) {
+        // Успешно залогинились — делаем авторизованный запрос за профилем
+        try {
+          const resp = await fetch(`${BACKEND}/api/users/me/`, {
+            credentials: 'include'
+          });
+          if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+          }
+          const user = await resp.json();
+          document.getElementById('message').style.color = 'green';
+          document.getElementById('message').textContent =
+            `Привіт, ${user.first_name || user.email}! Ви успішно увійшли.`;
+        } catch (e) {
+          document.getElementById('message').textContent =
+            'Не вдалося отримати дані користувача: ' + e.message;
+        }
+      }
+    });
+  </script>
+
+</body>
+</html>
