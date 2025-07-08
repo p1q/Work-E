@@ -66,12 +66,6 @@ class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
 
 
 class LinkedInProfileView(APIView):
-    """
-    Новый эндпоинт:
-    POST /api/users/linkedin/profile/
-    Тело запроса: { "access_token": "<LinkedIn access token>" }
-    Возвращает основные данные профиля и email.
-    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -87,25 +81,21 @@ class LinkedInProfileView(APIView):
             'X-Restli-Protocol-Version': '2.0.0',
         }
 
-        # 1) Получаем базовый профиль (минимальная проекция)
+        # 1) Получаем базовый профиль
         profile_url = (
             'https://api.linkedin.com/v2/me'
             '?projection=(id,localizedFirstName,localizedLastName)'
         )
+        profile_resp = requests.get(profile_url, headers=headers, timeout=10)
         try:
-            profile_resp = requests.get(profile_url, headers=headers, timeout=10)
             profile_data = profile_resp.json()
-            profile_resp.raise_for_status()
-        except requests.RequestException as e:
-            logger.error(
-                'LinkedIn profile fetch failed: status=%s, body=%s, error=%s',
-                getattr(profile_resp, 'status_code', None),
-                getattr(profile_resp, 'text', None),
-                e
-            )
+        except ValueError:
+            profile_data = {'error': profile_resp.text}
+
+        if profile_resp.status_code != 200:
             return Response(
-                {'error': 'Failed to fetch LinkedIn profile.', 'details': getattr(profile_resp, 'text', str(e))},
-                status=status.HTTP_502_BAD_GATEWAY
+                profile_data,
+                status=profile_resp.status_code
             )
 
         # 2) Получаем email
@@ -113,22 +103,18 @@ class LinkedInProfileView(APIView):
             'https://api.linkedin.com/v2/emailAddress'
             '?q=members&projection=(elements*(handle~))'
         )
-        email_address = None
+        email_resp = requests.get(email_url, headers=headers, timeout=10)
         try:
-            email_resp = requests.get(email_url, headers=headers, timeout=10)
             email_data = email_resp.json()
-            email_resp.raise_for_status()
+        except ValueError:
+            email_data = {}
+
+        email_address = None
+        if email_resp.status_code == 200:
             elements = email_data.get('elements', [])
             if elements:
                 handle = elements[0].get('handle~', {})
                 email_address = handle.get('emailAddress')
-        except requests.RequestException as e:
-            logger.warning(
-                'LinkedIn email fetch failed: status=%s, body=%s, error=%s',
-                getattr(email_resp, 'status_code', None),
-                getattr(email_resp, 'text', None),
-                e
-            )
 
         # 3) Формируем ответ
         response_data = {
