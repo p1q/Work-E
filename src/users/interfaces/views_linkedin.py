@@ -13,7 +13,17 @@ from .linkedin_oauth import LinkedInOAuthService
 logger = logging.getLogger(__name__)
 
 
-class LinkedInLoginView(View):
+class FrontendBaseURLMixin:
+    def _get_frontend_base_url(self, request):
+        origin = request.headers.get("Origin") or request.headers.get("Referer")
+        if not origin:
+            scheme = "https" if request.is_secure() else "http"
+            origin = f"{scheme}://{request.get_host()}"
+        parsed = urlparse(origin)
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+
+class LinkedInLoginView(FrontendBaseURLMixin, View):
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -28,59 +38,28 @@ class LinkedInLoginView(View):
         )
         return redirect(authorization_url)
 
-    def _get_frontend_base_url(self, request):
-        origin = request.headers.get("Origin") or request.headers.get("Referer")
-        if not origin:
-            scheme = "https" if request.is_secure() else "http"
-            origin = f"{scheme}://{request.get_host()}"
-        parsed = urlparse(origin)
-        return f"{parsed.scheme}://{parsed.netloc}"
 
-
-class LinkedInCallbackView(APIView):
+class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
         if request.GET.get("logged_in") == "true":
-            return Response(
-                {"logged_in": True},
-                status=status.HTTP_200_OK
-            )
+            return Response({"logged_in": True}, status=status.HTTP_200_OK)
 
         code = request.GET.get("code")
         error = request.GET.get("error")
 
         if error or not code:
-            return Response(
-                {"error": "auth_failed"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "auth_failed"}, status=status.HTTP_400_BAD_REQUEST)
 
         redirect_uri = request.session.pop("linkedin_redirect_uri", None)
         if not redirect_uri:
             logger.error("Missing redirect_uri in session")
-            return Response(
-                {"error": "server_error"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": "server_error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
         if not token:
             logger.error("LinkedIn token exchange failed")
-            return Response(
-                {"error": "token_failed"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": "token_failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response(
-            {"logged_in": True, "access_token": token},
-            status=status.HTTP_200_OK
-        )
-
-    def _get_frontend_base_url(self, request):
-        origin = request.headers.get("Origin") or request.headers.get("Referer")
-        if not origin:
-            scheme = "https" if request.is_secure() else "http"
-            origin = f"{scheme}://{request.get_host()}"
-        parsed = urlparse(origin)
-        return f"{parsed.scheme}://{parsed.netloc}"
+        return Response({"logged_in": True, "access_token": token}, status=status.HTTP_200_OK)
