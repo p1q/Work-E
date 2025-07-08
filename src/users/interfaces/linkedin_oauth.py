@@ -59,16 +59,16 @@ class LinkedInOAuthService:
     @classmethod
     def exchange_code_for_token(cls, code, verifier, redirect_uri):
         """
-        Обменивает authorization code на access token.
-        Одновременный Body + HTTP BasicAuth для надёжности.
+        Обмениваем authorization code на access token.
+        Передаём grant_type, code, redirect_uri, code_verifier и client_id в теле,
+        а client_secret — через BasicAuth.
         """
         payload = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri,
             "code_verifier": verifier,
-            "client_id": settings.LINKEDIN_CLIENT_ID,
-            "client_secret": settings.LINKEDIN_CLIENT_SECRET,
+            "client_id": settings.LINKEDIN_CLIENT_ID,  # теперь LinkedIn не жалуется на его отсутствие
         }
         logger.debug("LinkedIn.exchange_code_for_token payload: %s", payload)
 
@@ -87,13 +87,12 @@ class LinkedInOAuthService:
             logger.error("LinkedIn token exchange failed (exception): %s", e)
             return None
 
-        logger.debug(
-            "LinkedIn token exchange response: status=%s, body=%s",
-            resp.status_code, resp.text
-        )
-
         if not resp.ok:
-            # При не-200 сразу возвращаем None и дальше редирект с error=token_failed
+            logger.error(
+                "LinkedIn token exchange failed: status=%s, body=%s",
+                resp.status_code,
+                resp.text
+            )
             return None
 
         data = resp.json()
