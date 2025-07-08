@@ -44,6 +44,7 @@ class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        # Проверка быстрого запроса от фронтенда
         if request.GET.get("logged_in") == "true":
             return Response({"logged_in": True}, status=status.HTTP_200_OK)
 
@@ -69,29 +70,38 @@ class LinkedInProfileView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        access_token = request.data.get('access_token')
+        access_token = request.data.get("access_token")
         if not access_token:
             return Response(
-                {'error': 'Access token is required.'},
+                {"error": "Access token is required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         headers = {
-            'Authorization': f'Bearer {access_token}',
+            "Authorization": f"Bearer {access_token}",
         }
+        userinfo_url = "https://api.linkedin.com/v2/userinfo"
 
-        userinfo_url = 'https://api.linkedin.com/v2/userinfo'
-        userinfo_resp = requests.get(userinfo_url, headers=headers, timeout=10)
-
+        resp = requests.get(userinfo_url, headers=headers, timeout=10)
         try:
-            userinfo_data = userinfo_resp.json()
+            data = resp.json()
         except ValueError:
-            userinfo_data = {'error': userinfo_resp.text}
-
-        if userinfo_resp.status_code != 200:
             return Response(
-                userinfo_data,
-                status=userinfo_resp.status_code
+                {"error": "Invalid JSON from LinkedIn", "details": resp.text},
+                status=status.HTTP_502_BAD_GATEWAY
             )
 
-        return Response(userinfo_data, status=status.HTTP_200_OK)
+        if resp.status_code != 200:
+            return Response(data, status=resp.status_code)
+
+        result = {
+            "id": data.get("sub"),
+            "email": data.get("email"),
+            "email_verified": data.get("email_verified"),
+            "first_name": data.get("given_name"),
+            "last_name": data.get("family_name"),
+            "full_name": data.get("name"),
+            "locale": data.get("locale"),
+            "picture": data.get("picture"),
+        }
+        return Response(result, status=status.HTTP_200_OK)
