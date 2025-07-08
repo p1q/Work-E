@@ -78,50 +78,20 @@ class LinkedInProfileView(APIView):
 
         headers = {
             'Authorization': f'Bearer {access_token}',
-            'X-Restli-Protocol-Version': '2.0.0',
         }
 
-        # 1) Получаем базовый профиль
-        profile_url = (
-            'https://api.linkedin.com/v2/me'
-            '?projection=(id,localizedFirstName,localizedLastName)'
-        )
-        profile_resp = requests.get(profile_url, headers=headers, timeout=10)
-        try:
-            profile_data = profile_resp.json()
-        except ValueError:
-            profile_data = {'error': profile_resp.text}
+        userinfo_url = 'https://api.linkedin.com/v2/userinfo'
+        userinfo_resp = requests.get(userinfo_url, headers=headers, timeout=10)
 
-        if profile_resp.status_code != 200:
+        try:
+            userinfo_data = userinfo_resp.json()
+        except ValueError:
+            userinfo_data = {'error': userinfo_resp.text}
+
+        if userinfo_resp.status_code != 200:
             return Response(
-                profile_data,
-                status=profile_resp.status_code
+                userinfo_data,
+                status=userinfo_resp.status_code
             )
 
-        # 2) Получаем email
-        email_url = (
-            'https://api.linkedin.com/v2/emailAddress'
-            '?q=members&projection=(elements*(handle~))'
-        )
-        email_resp = requests.get(email_url, headers=headers, timeout=10)
-        try:
-            email_data = email_resp.json()
-        except ValueError:
-            email_data = {}
-
-        email_address = None
-        if email_resp.status_code == 200:
-            elements = email_data.get('elements', [])
-            if elements:
-                handle = elements[0].get('handle~', {})
-                email_address = handle.get('emailAddress')
-
-        # 3) Формируем ответ
-        response_data = {
-            'id': profile_data.get('id'),
-            'first_name': profile_data.get('localizedFirstName'),
-            'last_name': profile_data.get('localizedLastName'),
-            'email': email_address,
-            'profile_raw': profile_data,
-        }
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response(userinfo_data, status=status.HTTP_200_OK)
