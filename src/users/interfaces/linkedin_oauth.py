@@ -6,80 +6,60 @@ import logging
 from urllib.parse import urlencode
 
 import requests
-from requests.auth import HTTPBasicAuth
 from django.conf import settings
-from users.infrastructure.models import User
 
 logger = logging.getLogger(__name__)
-
 
 class LinkedInOAuthService:
     AUTHORIZATION_URL = "https://www.linkedin.com/oauth/v2/authorization"
     TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
-    USERINFO_URL = "https://api.linkedin.com/oauth/v2/userinfo"
 
     @staticmethod
     def generate_pkce_and_state(request):
         state = secrets.token_urlsafe(16)
-        code_verifier = base64.urlsafe_b64encode(os.urandom(40)).rstrip(b"=").decode("ascii")
-        code_challenge = base64.urlsafe_b64encode(
-            hashlib.sha256(code_verifier.encode("ascii")).digest()
-        ).rstrip(b"=").decode("ascii")
-
         request.session["linkedin_oauth_state"] = state
-        request.session["linkedin_code_verifier"] = code_verifier
-        return state, code_challenge
+        return state, None  # Убираем возвращение challenge и verifier
 
     @classmethod
     def build_authorization_url(cls, state, code_challenge, redirect_uri):
         params = {
-            "response_type": "code",
+            "response_type": "code",  # Получаем код авторизации
             "client_id": settings.LINKEDIN_CLIENT_ID,
             "redirect_uri": redirect_uri,
             "state": state,
-            "scope": "openid profile email",
-            "code_challenge": code_challenge,
-            "code_challenge_method": "S256",
+            "scope": "openid profile email",  # Только для авторизации
         }
         return f"{cls.AUTHORIZATION_URL}?{urlencode(params)}"
 
     @staticmethod
     def validate_state_and_get_verifier(request):
+        # Этот метод теперь просто возвращает state без code_verifier
         incoming = request.GET.get("state")
         stored = request.session.get("linkedin_oauth_state")
-        verifier = request.session.get("linkedin_code_verifier")
 
-        if incoming != stored or not verifier:
+        if incoming != stored:
             return None
 
         request.session.pop("linkedin_oauth_state", None)
-        request.session.pop("linkedin_code_verifier", None)
-        return verifier
+        return None  # Не нужен code_verifier
 
     @classmethod
-    def exchange_code_for_token(cls, code, verifier, redirect_uri):
+    def exchange_code_for_token(cls, code, redirect_uri):
         """
         Обмениваем authorization code на access token.
-        Передаём grant_type, code, redirect_uri, code_verifier и client_id в теле,
-        а client_secret — через BasicAuth.
+        Передаем grant_type, code, redirect_uri и client_id в теле.
         """
         payload = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri,
-            "code_verifier": verifier,
-            "client_id": settings.LINKEDIN_CLIENT_ID,  # теперь LinkedIn не жалуется на его отсутствие
+            "client_id": settings.LINKEDIN_CLIENT_ID,
+            "client_secret": settings.LINKEDIN_CLIENT_SECRET
         }
-        logger.debug("LinkedIn.exchange_code_for_token payload: %s", payload)
-
         try:
             resp = requests.post(
                 cls.TOKEN_URL,
                 data=payload,
-                auth=HTTPBasicAuth(
-                    settings.LINKEDIN_CLIENT_ID,
-                    settings.LINKEDIN_CLIENT_SECRET
-                ),
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 timeout=10,
             )
@@ -96,62 +76,4 @@ class LinkedInOAuthService:
             return None
 
         data = resp.json()
-        return data.get("access_token")
-
-    @classmethod
-    def fetch_userinfo_via_oidc(cls, access_token):
-        headers = {"Authorization": f"Bearer {access_token}"}
-        resp = requests.get(
-            cls.USERINFO_URL,
-            headers=headers,
-            timeout=10,
-        )
-        resp.raise_for_status()
-        info = resp.json()
-
-        if not info.get("email_verified", False):
-            raise ValueError("Email not verified by LinkedIn")
-
-        email = info.get("email")
-        if not email:
-            raise ValueError("No email returned by LinkedIn OIDC")
-
-        return {
-            "email": email,
-            "first_name": info.get("localizedFirstName", ""),
-            "last_name": info.get("localizedLastName", ""),
-            "linkedin_id": info.get("id", ""),
-            "avatar_url": info.get("picture", ""),
-        }
-
-    @staticmethod
-    def get_or_create_user(user_data):
-        email = user_data["email"]
-        base_username = email.split("@")[0]
-        username = base_username
-
-        existing = User.objects.filter(email__iexact=email).first()
-        defaults = {
-            "first_name": user_data["first_name"],
-            "last_name": user_data["last_name"],
-            "avatar_url": user_data["avatar_url"],
-            "linkedin_id": user_data["linkedin_id"],
-        }
-
-        if User.objects.filter(username__iexact=username).exists():
-            import uuid
-            suffix = uuid.uuid4().hex[:8]
-            username = f"{base_username}-{suffix}"
-
-        if existing:
-            existing.username = username
-            for field, value in defaults.items():
-                setattr(existing, field, value)
-            existing.save(update_fields=["username"] + list(defaults.keys()))
-            return existing
-        else:
-            return User.objects.create(
-                email=email,
-                username=username,
-                **defaults
-            )
+        return data.get("access_token")  # Возвращаем только access token
