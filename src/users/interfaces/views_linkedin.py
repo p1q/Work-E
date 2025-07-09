@@ -1,50 +1,36 @@
 import logging
-from urllib.parse import urlparse
-
 import requests
+from django.conf import settings
 from django.shortcuts import redirect
-from django.views import View
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.views import APIView, View
 
 from .linkedin_oauth import LinkedInOAuthService
 
 logger = logging.getLogger(__name__)
 
 
-class FrontendBaseURLMixin:
-    def _get_frontend_base_url(self, request):
-        origin = request.headers.get("Origin") or request.headers.get("Referer")
-        if not origin:
-            scheme = "https" if request.is_secure() else "http"
-            origin = f"{scheme}://{request.get_host()}"
-        parsed = urlparse(origin)
-        return f"{parsed.scheme}://{parsed.netloc}"
-
-
-class LinkedInLoginView(FrontendBaseURLMixin, View):
+class LinkedInLoginView(View):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        frontend_base_url = self._get_frontend_base_url(request)
-
         state, _ = LinkedInOAuthService.generate_pkce_and_state(request)
-        redirect_uri = f"{frontend_base_url}/api/users/linkedin/callback/"
-        request.session["linkedin_redirect_uri"] = redirect_uri
-
+        base = settings.BACKEND_BASE_URL.rstrip('/')
+        redirect_uri = f"{base}/api/users/linkedin/callback/"
         authorization_url = LinkedInOAuthService.build_authorization_url(
-            state, None, redirect_uri
+            state=state,
+            code_challenge=None,
+            redirect_uri=redirect_uri
         )
         return redirect(authorization_url)
 
 
-class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
+class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Проверка быстрого запроса от фронтенда
         if request.GET.get("logged_in") == "true":
             return Response({"logged_in": True}, status=status.HTTP_200_OK)
 
@@ -53,10 +39,8 @@ class LinkedInCallbackView(FrontendBaseURLMixin, APIView):
         if error or not code:
             return Response({"error": "auth_failed"}, status=status.HTTP_400_BAD_REQUEST)
 
-        redirect_uri = request.session.pop("linkedin_redirect_uri", None)
-        if not redirect_uri:
-            logger.warning("redirect_uri missing in session, using default")
-            redirect_uri = f"{self._get_frontend_base_url(request)}/api/users/linkedin/callback/"
+        base = settings.BACKEND_BASE_URL.rstrip('/')
+        redirect_uri = f"{base}/api/users/linkedin/callback/"
 
         token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
         if not token:
@@ -72,14 +56,10 @@ class LinkedInProfileView(APIView):
     def post(self, request):
         access_token = request.data.get("access_token")
         if not access_token:
-            return Response(
-                {"error": "Access token is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Access token is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-        }
+        headers = {"Authorization": f"Bearer {access_token}"}
         userinfo_url = "https://api.linkedin.com/v2/userinfo"
 
         resp = requests.get(userinfo_url, headers=headers, timeout=10)
@@ -94,7 +74,7 @@ class LinkedInProfileView(APIView):
         if resp.status_code != 200:
             return Response(data, status=resp.status_code)
 
-        result = {
+        return Response({
             "id": data.get("sub"),
             "email": data.get("email"),
             "email_verified": data.get("email_verified"),
@@ -103,5 +83,4 @@ class LinkedInProfileView(APIView):
             "full_name": data.get("name"),
             "locale": data.get("locale"),
             "picture": data.get("picture"),
-        }
-        return Response(result, status=status.HTTP_200_OK)
+        }, status=status.HTTP_200_OK)
