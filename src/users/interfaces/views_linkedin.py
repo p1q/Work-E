@@ -12,6 +12,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from .linkedin_oauth import LinkedInOAuthService
 from users.infrastructure.models import User
+from users.interfaces.serializers import LinkedInProfileResponseSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -100,11 +101,12 @@ class LinkedInCallbackView(APIView):
     ],
     responses={
         200: OpenApiResponse(
+            response=LinkedInProfileResponseSerializer,
             description='Successful login via LinkedIn',
             examples=[
                 OpenApiExample(
                     name='Приклад успішної відповіді',
-                    summary='Успішний вхід',
+                    summary='Успішний вхід через LinkedIn',
                     value={
                         "token": "25824a7a869e57b4be947740d18bf2138342be7e",
                         "user": {
@@ -113,7 +115,7 @@ class LinkedInCallbackView(APIView):
                             "username": "admin",
                             "first_name": "Eugeny",
                             "last_name": "Petrov",
-                            "avatar_url": "https://media.licdn.com/dms/image/v2/C4D03AQHrDcN-vitzCA/profile-displayphoto-shrink_100_100/profile-displayphoto-shrink_100_100/0/1560361661685?e=1757548800&v=beta&t=yBatv03-ucVZVaOgtJmQnpbZE",
+                            "avatar_url": "https://media.licdn.com/...",
                             "linkedin_id": "E0P1gsNdct",
                             "date_joined": "2025-06-18T20:14:24.484568Z"
                         }
@@ -138,7 +140,7 @@ class LinkedInCallbackView(APIView):
             examples=[
                 OpenApiExample(
                     name='Invalid JSON',
-                    summary='LinkedIn returned non‑JSON body',
+                    summary='LinkedIn returned non-JSON body',
                     value={'error': 'Invalid JSON from LinkedIn', 'details': '<raw body>'},
                     response_only=True
                 )
@@ -188,8 +190,6 @@ class LinkedInProfileView(APIView):
                 defaults=defaults
             )
         except IntegrityError as e:
-            # если при создании нового пользователя возник конфликт по username/email,
-            # находим существующего по email и дополняем ему linkedin_id
             logger.warning("LinkedIn create failed, merging existing user: %s", e)
             user = User.objects.get(email__iexact=email)
             user.linkedin_id = linkedin_id
