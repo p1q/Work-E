@@ -9,6 +9,8 @@ from rest_framework.views import APIView, View
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from .linkedin_oauth import LinkedInOAuthService
+from users.infrastructure.models import User
+from rest_framework.authtoken.models import Token
 
 logger = logging.getLogger(__name__)
 
@@ -137,13 +139,35 @@ class LinkedInProfileView(APIView):
         if resp.status_code != 200:
             return Response(data, status=resp.status_code)
 
+        linkedin_id = data.get("sub")
+        email = data.get("email")
+        first_name = data.get("given_name", "")
+        last_name = data.get("family_name", "")
+        avatar = data.get("picture", "")
+
+        user, _ = User.objects.update_or_create(
+            linkedin_id=linkedin_id,
+            defaults={
+                'email': email,
+                'username': email.split('@')[0],
+                'first_name': first_name,
+                'last_name': last_name,
+                'avatar_url': avatar,
+            }
+        )
+
+        token_obj, _ = Token.objects.get_or_create(user=user)
+
         return Response({
-            "id": data.get("sub"),
-            "email": data.get("email"),
-            "email_verified": data.get("email_verified"),
-            "first_name": data.get("given_name"),
-            "last_name": data.get("family_name"),
-            "full_name": data.get("name"),
-            "locale": data.get("locale"),
-            "picture": data.get("picture"),
+            'token': token_obj.key,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'avatar_url': user.avatar_url,
+                'linkedin_id': user.linkedin_id,
+                'date_joined': user.date_joined,
+            }
         }, status=status.HTTP_200_OK)

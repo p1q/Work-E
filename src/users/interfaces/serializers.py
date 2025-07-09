@@ -32,14 +32,15 @@ class UserSerializer(serializers.ModelSerializer):
     )
     email = serializers.EmailField(max_length=254)
     avatar_url = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    linkedin_id = serializers.CharField(read_only=True)
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
-            'avatar_url', 'date_joined'
+            'avatar_url', 'linkedin_id', 'date_joined'
         ]
-        read_only_fields = ['id', 'date_joined']
+        read_only_fields = ['id', 'date_joined', 'linkedin_id']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
