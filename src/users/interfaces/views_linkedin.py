@@ -1,7 +1,9 @@
 import logging
+
 import requests
 from django.conf import settings
 from django.shortcuts import redirect
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -12,6 +14,7 @@ from .linkedin_oauth import LinkedInOAuthService
 logger = logging.getLogger(__name__)
 
 
+@extend_schema(tags=['Users'])
 class LinkedInLoginView(View):
     permission_classes = [AllowAny]
 
@@ -26,6 +29,7 @@ class LinkedInLoginView(View):
         return redirect(authorization_url)
 
 
+@extend_schema(tags=['Users'])
 class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
@@ -49,6 +53,7 @@ class LinkedInCallbackView(APIView):
         return Response({"logged_in": True, "access_token": token}, status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['Users'])
 class LinkedInProfileView(APIView):
     permission_classes = [AllowAny]
 
