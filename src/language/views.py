@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import JSONParser
+from drf_spectacular.utils import extend_schema, OpenApiExample
 
 from .serializers import LanguageDetectSerializer
 
@@ -23,6 +24,20 @@ class LenientJSONParser(JSONParser):
         return super().parse(cleaned_stream, media_type, parser_context)
 
 
+@extend_schema(
+    tags=['Language'],
+    request=LanguageDetectSerializer,
+    responses={200: {'application/json': {'language': 'en', 'confidence': 0.9876}}},
+    examples=[
+        OpenApiExample(
+            'Приклад запиту',
+            summary='Визначення мови',
+            value={'text': 'Hello, world!'},
+            request_only=True,
+            response_only=False,
+        )
+    ]
+)
 class LanguageDetectView(APIView):
     parser_classes = [LenientJSONParser]
 

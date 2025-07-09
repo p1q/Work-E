@@ -4,15 +4,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
+from drf_spectacular.utils import extend_schema, OpenApiExample
 
 from users.infrastructure.models import User
-from users.interfaces.serializers import (
-    UserSerializer,
-    RegisterSerializer,
-    LoginSerializer
+from users.interfaces.serializers import UserSerializer, RegisterSerializer, LoginSerializer
+
+
+@extend_schema(
+    tags=['Users'],
+    request=UserSerializer,
+    responses={200: UserSerializer}
 )
-
-
 class UserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -33,11 +35,25 @@ class UserListCreateView(generics.ListCreateAPIView):
         return super().create(request, *args, **kwargs)
 
 
+@extend_schema(
+    tags=['Users'],
+    request=UserSerializer,
+    responses={200: UserSerializer}
+)
 class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
 
+@extend_schema(
+    tags=['Users'],
+    request=RegisterSerializer,
+    responses={201: {'application/json': {'token': 'abc123'}}, 400: None},
+    examples=[
+        OpenApiExample('Реєстрація', summary='Створення нового користувача',
+                       value={'email': 'a@b.c', 'username': 'user', 'password': 'pass'})
+    ]
+)
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
@@ -67,6 +83,15 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Users'],
+    request=LoginSerializer,
+    responses={200: {'application/json': {'token': 'abc123'}}, 400: None},
+    examples=[
+        OpenApiExample('Логін', summary='Аутентифікація за email і паролем',
+                       value={'email': 'a@b.c', 'password': 'pass'})
+    ]
+)
 class LoginView(APIView):
     permission_classes = [AllowAny]
 

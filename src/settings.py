@@ -94,11 +94,20 @@ REST_FRAMEWORK = {
     ],
 }
 
+# drf-spectacular OpenAPI / Swagger settings
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Work-E API',
-    'DESCRIPTION': 'Work-E API',
+    'DESCRIPTION': 'Full OpenAPI schema for Work-E API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+    'COMPONENT_SPLIT_REQUEST': True,
+    'COMPONENT_SPLIT_PARAMETERS': True,
+    'SWAGGER_UI_SETTINGS': {
+        'layout': 'BaseLayout',
+        'tagsSorter': 'alpha',
+        'operationsSorter': 'method',
+    },
 }
 
 SIMPLE_JWT = {

@@ -2,23 +2,40 @@ from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser
+from drf_spectacular.utils import extend_schema
 
 from cvs.models import CV
 from .serializers import CVSerializer
 
 
+@extend_schema(
+    tags=['CV'],
+    request=CVSerializer,
+    responses={201: CVSerializer, 400: None}
+)
 class CVListCreateView(generics.ListCreateAPIView):
     queryset = CV.objects.all()
     serializer_class = CVSerializer
     permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser]
 
 
+@extend_schema(
+    tags=['CV'],
+    responses={200: CVSerializer, 404: None}
+)
 class CVRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     queryset = CV.objects.all()
     serializer_class = CVSerializer
     permission_classes = [AllowAny]
 
 
+@extend_schema(
+    tags=['CV'],
+    request={'application/json': {'email': 'user@example.com'}},
+    responses={200: CVSerializer(many=True), 400: None, 404: None}
+)
 class CVByEmailPostView(APIView):
     permission_classes = [AllowAny]
 
@@ -35,6 +52,11 @@ class CVByEmailPostView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    tags=['CV'],
+    request={'application/json': {'email': 'user@example.com'}},
+    responses={200: CVSerializer, 400: None, 404: None}
+)
 class LastCVByEmailPostView(APIView):
     permission_classes = [AllowAny]
 

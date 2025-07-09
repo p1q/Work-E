@@ -2,19 +2,20 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from drf_spectacular.utils import extend_schema
 
-from chatgpt.service import (
-    generate_chat_response,
-    estimate_cost,
-)
+from chatgpt.service import generate_chat_response, estimate_cost
 from chatgpt.interfaces.serializers import (
-    ChatGPTRequestSerializer,
-    ChatGPTResponseSerializer,
-    ChatGPTPlanRequestSerializer,
-    ChatGPTPlanResponseSerializer,
+    ChatGPTRequestSerializer, ChatGPTResponseSerializer,
+    ChatGPTPlanRequestSerializer, ChatGPTPlanResponseSerializer
 )
 
 
+@extend_schema(
+    tags=['ChatGPT'],
+    request=ChatGPTRequestSerializer,
+    responses={200: ChatGPTResponseSerializer, 500: None}
+)
 class ChatGPTAPIView(APIView):
     permission_classes = [AllowAny]
 
@@ -39,6 +40,11 @@ class ChatGPTAPIView(APIView):
         return Response(resp_ser.data, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    tags=['ChatGPT'],
+    request=ChatGPTPlanRequestSerializer,
+    responses={200: ChatGPTPlanResponseSerializer}
+)
 class ChatGPTPlanAPIView(APIView):
     permission_classes = [AllowAny]
 
