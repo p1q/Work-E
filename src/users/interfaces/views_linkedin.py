@@ -1,20 +1,24 @@
 import logging
-
 import requests
 from django.conf import settings
 from django.shortcuts import redirect
-from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView, View
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from .linkedin_oauth import LinkedInOAuthService
 
 logger = logging.getLogger(__name__)
 
 
-@extend_schema(tags=['Users'])
+@extend_schema(
+    tags=['Users'],
+    responses={
+        302: None
+    }
+)
 class LinkedInLoginView(View):
     permission_classes = [AllowAny]
 
@@ -29,7 +33,34 @@ class LinkedInLoginView(View):
         return redirect(authorization_url)
 
 
-@extend_schema(tags=['Users'])
+@extend_schema(
+    tags=['Users'],
+    responses={
+        200: None,
+        400: OpenApiResponse(
+            description='Authentication failed due to missing/invalid code or error from provider',
+            examples=[
+                OpenApiExample(
+                    name='Missing code',
+                    summary='No code or error query param',
+                    value={'error': 'auth_failed'},
+                    response_only=True,
+                ),
+            ]
+        ),
+        500: OpenApiResponse(
+            description='LinkedIn token exchange failed on server side',
+            examples=[
+                OpenApiExample(
+                    name='Exchange error',
+                    summary='Token endpoint returned error',
+                    value={'error': 'token_failed'},
+                    response_only=True
+                )
+            ]
+        )
+    }
+)
 class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
@@ -53,7 +84,35 @@ class LinkedInCallbackView(APIView):
         return Response({"logged_in": True, "access_token": token}, status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['Users'])
+@extend_schema(
+    tags=['Users'],
+    request={'application/json': {'access_token': 'string'}},
+    responses={
+        200: None,
+        400: OpenApiResponse(
+            description='Access token missing or invalid request format',
+            examples=[
+                OpenApiExample(
+                    name='No token provided',
+                    summary='Missing access_token in body',
+                    value={'error': 'Access token is required.'},
+                    response_only=True
+                )
+            ]
+        ),
+        502: OpenApiResponse(
+            description='Bad gateway — invalid JSON from LinkedIn',
+            examples=[
+                OpenApiExample(
+                    name='Invalid JSON',
+                    summary='LinkedIn returned non‑JSON body',
+                    value={'error': 'Invalid JSON from LinkedIn', 'details': '<raw body>'},
+                    response_only=True
+                )
+            ]
+        )
+    }
+)
 class LinkedInProfileView(APIView):
     permission_classes = [AllowAny]
 

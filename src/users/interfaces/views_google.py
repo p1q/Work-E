@@ -3,14 +3,37 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from .serializers_google import GoogleAuthSerializer
 
 logger = logging.getLogger(__name__)
 
 
-@extend_schema(tags=['Users'])
+@extend_schema(
+    tags=['Users'],
+    request=GoogleAuthSerializer,
+    responses={
+        200: None,
+        400: OpenApiResponse(
+            description='Invalid or malformed Google ID token',
+            examples=[
+                OpenApiExample(
+                    name='Malformed token',
+                    summary='Token is not a valid JWT',
+                    value={'detail': 'Invalid Google ID token: Unable to parse'},
+                    response_only=True
+                ),
+                OpenApiExample(
+                    name='Audience mismatch',
+                    summary='Token audience does not match',
+                    value={'detail': 'Token audience mismatch'},
+                    response_only=True
+                ),
+            ]
+        )
+    }
+)
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
 
