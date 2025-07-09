@@ -88,8 +88,40 @@ class LinkedInCallbackView(APIView):
 @extend_schema(
     tags=['Users'],
     request={'application/json': {'access_token': 'string'}},
+    examples=[
+        OpenApiExample(
+            name='Приклад запиту',
+            summary='Вхід через LinkedIn',
+            request_only=True,
+            value={
+                "access_token": "AQX ... 6AvNb2OsMu2GBRXvKeGxiUw"
+            }
+        )
+    ],
     responses={
-        200: None,
+        200: OpenApiResponse(
+            description='Successful login via LinkedIn',
+            examples=[
+                OpenApiExample(
+                    name='Приклад успішної відповіді',
+                    summary='Успішний вхід',
+                    value={
+                        "token": "25824a7a869e57b4be947740d18bf2138342be7e",
+                        "user": {
+                            "id": 81,
+                            "email": "admin@gmail.com",
+                            "username": "admin",
+                            "first_name": "Eugeny",
+                            "last_name": "Petrov",
+                            "avatar_url": "https://media.licdn.com/dms/image/v2/C4D03AQHrDcN-vitzCA/profile-displayphoto-shrink_100_100/profile-displayphoto-shrink_100_100/0/1560361661685?e=1757548800&v=beta&t=yBatv03-ucVZVaOgtJmQnpbZE",
+                            "linkedin_id": "E0P1gsNdct",
+                            "date_joined": "2025-06-18T20:14:24.484568Z"
+                        }
+                    },
+                    response_only=True
+                )
+            ]
+        ),
         400: OpenApiResponse(
             description='Access token missing or invalid request format',
             examples=[
