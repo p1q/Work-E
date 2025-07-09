@@ -2,26 +2,25 @@ import logging
 import requests
 from django.conf import settings
 from django.shortcuts import redirect
+from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.views import APIView, View
+from rest_framework.views import APIView
+from rest_framework.authtoken.models import Token
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from .linkedin_oauth import LinkedInOAuthService
 from users.infrastructure.models import User
-from rest_framework.authtoken.models import Token
 
 logger = logging.getLogger(__name__)
 
 
 @extend_schema(
     tags=['Users'],
-    responses={
-        302: None
-    }
+    responses={302: None}
 )
-class LinkedInLoginView(View):
+class LinkedInLoginView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -124,10 +123,9 @@ class LinkedInProfileView(APIView):
             return Response({"error": "Access token is required."},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # 1. Запрашиваем профиль у LinkedIn
         headers = {"Authorization": f"Bearer {access_token}"}
-        userinfo_url = "https://api.linkedin.com/v2/userinfo"
-
-        resp = requests.get(userinfo_url, headers=headers, timeout=10)
+        resp = requests.get("https://api.linkedin.com/v2/userinfo", headers=headers, timeout=10)
         try:
             data = resp.json()
         except ValueError:
@@ -135,7 +133,6 @@ class LinkedInProfileView(APIView):
                 {"error": "Invalid JSON from LinkedIn", "details": resp.text},
                 status=status.HTTP_502_BAD_GATEWAY
             )
-
         if resp.status_code != 200:
             return Response(data, status=resp.status_code)
 
@@ -145,19 +142,32 @@ class LinkedInProfileView(APIView):
         last_name = data.get("family_name", "")
         avatar = data.get("picture", "")
 
-        user, _ = User.objects.update_or_create(
-            linkedin_id=linkedin_id,
-            defaults={
-                'email': email,
-                'username': email.split('@')[0],
-                'first_name': first_name,
-                'last_name': last_name,
-                'avatar_url': avatar,
-            }
-        )
+        # 2. Пытаемся update_or_create только по linkedin_id
+        defaults = {
+            'email': email,
+            'username': email.split('@')[0],
+            'first_name': first_name,
+            'last_name': last_name,
+            'avatar_url': avatar,
+        }
+        try:
+            user, created = User.objects.update_or_create(
+                linkedin_id=linkedin_id,
+                defaults=defaults
+            )
+        except IntegrityError as e:
+            # если при создании нового пользователя возник конфликт по username/email,
+            # находим существующего по email и дополняем ему linkedin_id
+            logger.warning("LinkedIn create failed, merging existing user: %s", e)
+            user = User.objects.get(email__iexact=email)
+            user.linkedin_id = linkedin_id
+            user.first_name = first_name
+            user.last_name = last_name
+            user.avatar_url = avatar
+            user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
 
+        # 3. Возвращаем токен и профиль
         token_obj, _ = Token.objects.get_or_create(user=user)
-
         return Response({
             'token': token_obj.key,
             'user': {
