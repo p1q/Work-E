@@ -18,7 +18,7 @@ class LinkedInOAuthService:
         return state, None
 
     @classmethod
-    def build_authorization_url(cls, state, code_challenge, redirect_uri):
+    def build_authorization_url(cls, state, redirect_uri):
         params = {
             "response_type": "code",
             "client_id": settings.LINKEDIN_CLIENT_ID,

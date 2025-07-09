@@ -21,7 +21,6 @@ class LinkedInLoginView(View):
         redirect_uri = f"{base}/api/users/linkedin/callback/"
         authorization_url = LinkedInOAuthService.build_authorization_url(
             state=state,
-            code_challenge=None,
             redirect_uri=redirect_uri
         )
         return redirect(authorization_url)
