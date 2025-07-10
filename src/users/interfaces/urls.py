@@ -11,14 +11,19 @@ from users.interfaces.views_linkedin import (
     LinkedInCallbackView,
     LinkedInProfileView,
 )
+from users.interfaces.views_auth import LogoutView
 
 urlpatterns = [
     path('', UserListCreateView.as_view(), name='user-list-create'),
     path('<int:pk>/', UserRetrieveUpdateDestroyView.as_view(), name='user-detail'),
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
-    path('google-login/', GoogleLoginView.as_view(), name='google-login'),
+
+    path('google/login/', GoogleLoginView.as_view(), name='google-login'),
+
     path('linkedin/login/', LinkedInLoginView.as_view(), name='linkedin-login'),
     path('linkedin/callback/', LinkedInCallbackView.as_view(), name='linkedin-callback'),
     path('linkedin/profile/', LinkedInProfileView.as_view(), name='linkedin-profile'),
+
+    path('logout/', LogoutView.as_view(), name='logout'),
 ]
