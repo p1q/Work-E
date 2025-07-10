@@ -1,4 +1,6 @@
 import logging
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.shortcuts import redirect
 from rest_framework.views import APIView
@@ -38,7 +40,9 @@ logger = logging.getLogger(__name__)
                 )
             ]
         ),
-        302: OpenApiResponse(description='Redirect to frontend signin on cancel or missing token'),
+        302: OpenApiResponse(
+            description='Redirect to frontend sign-up on cancel or missing token'
+        ),
         400: OpenApiResponse(
             description='Invalid or malformed Google ID token',
             examples=[
@@ -56,7 +60,7 @@ logger = logging.getLogger(__name__)
                 ),
             ]
         )
-    }
+    },
 )
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
@@ -65,16 +69,21 @@ class GoogleLoginView(APIView):
         error = request.data.get('error')
         id_token_value = request.data.get('id_token')
         if error or not id_token_value:
-            frontend = settings.FRONTEND_URL.rstrip('/')
-            return redirect(f"{frontend}/sign-up")
+            # будуємо origin (scheme + netloc) із FRONTEND_URL
+            parsed = urlparse(settings.FRONTEND_URL)
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+            return redirect(f"{origin}/sign-up")
 
+        # 1) Валідація id_token
         serializer = GoogleAuthSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # 2) Логіка створення/отримання користувача
         result = serializer.save()
         user = result['user']
         token = result['token']
 
+        # 3) Повертаємо токен і дані профілю
         return Response({
             'token': token,
             'user': {

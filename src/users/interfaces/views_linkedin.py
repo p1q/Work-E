@@ -1,5 +1,7 @@
 import logging
 import requests
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.shortcuts import redirect
 from django.db import IntegrityError
@@ -38,8 +40,18 @@ class LinkedInLoginView(APIView):
 @extend_schema(
     tags=['Users'],
     responses={
-        302: OpenApiResponse(description='Redirect to frontend signin on cancel'),
-        200: None,
+        302: None,
+        400: OpenApiResponse(
+            description='Authentication failed due to missing/invalid code or error from provider',
+            examples=[
+                OpenApiExample(
+                    name='Missing code',
+                    summary='User cancelled login',
+                    value={},
+                    response_only=True,
+                ),
+            ]
+        ),
         500: OpenApiResponse(
             description='LinkedIn token exchange failed on server side',
             examples=[
@@ -63,8 +75,9 @@ class LinkedInCallbackView(APIView):
         code = request.GET.get("code")
         error = request.GET.get("error")
         if error or not code:
-            frontend = settings.FRONTEND_URL.rstrip('/')
-            return redirect(f"{frontend}/sign-up")
+            parsed = urlparse(settings.FRONTEND_URL)
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+            return redirect(f"{origin}/sign-up")
 
         base = settings.BACKEND_BASE_URL.rstrip('/')
         redirect_uri = f"{base}/api/users/linkedin/callback/"
@@ -145,8 +158,8 @@ class LinkedInProfileView(APIView):
     def post(self, request):
         access_token = request.data.get("access_token")
         if not access_token:
-            frontend = settings.FRONTEND_URL.rstrip('/')
-            return redirect(f"{frontend}/signin")
+            return Response({"error": "Access token is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         headers = {"Authorization": f"Bearer {access_token}"}
         resp = requests.get("https://api.linkedin.com/v2/userinfo", headers=headers, timeout=10)
@@ -178,7 +191,8 @@ class LinkedInProfileView(APIView):
                 linkedin_id=linkedin_id,
                 defaults=defaults
             )
-        except IntegrityError:
+        except IntegrityError as e:
+            logger.warning("LinkedIn create failed, merging existing user: %s", e)
             user = User.objects.get(email__iexact=email)
             user.linkedin_id = linkedin_id
             user.first_name = first_name
