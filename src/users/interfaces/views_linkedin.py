@@ -38,18 +38,7 @@ class LinkedInLoginView(APIView):
 @extend_schema(
     tags=['Users'],
     responses={
-        200: None,
-        400: OpenApiResponse(
-            description='Authentication failed due to missing/invalid code or error from provider',
-            examples=[
-                OpenApiExample(
-                    name='Missing code',
-                    summary='No code or error query param',
-                    value={'error': 'auth_failed'},
-                    response_only=True,
-                ),
-            ]
-        ),
+        302: None,
         500: OpenApiResponse(
             description='LinkedIn token exchange failed on server side',
             examples=[
@@ -67,13 +56,17 @@ class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        # Якщо вже залогінені через параметр logged_in
         if request.GET.get("logged_in") == "true":
             return Response({"logged_in": True}, status=status.HTTP_200_OK)
 
         code = request.GET.get("code")
         error = request.GET.get("error")
+
+        # При натисканні кнопки "Cancel" у LinkedIn прийде error або відсутній code
         if error or not code:
-            return Response({"error": "auth_failed"}, status=status.HTTP_400_BAD_REQUEST)
+            frontend_signup = settings.FRONTEND_URL.rstrip('/') + '/sign-up'
+            return redirect(frontend_signup)
 
         base = settings.BACKEND_BASE_URL.rstrip('/')
         redirect_uri = f"{base}/api/users/linkedin/callback/"
@@ -115,7 +108,7 @@ class LinkedInCallbackView(APIView):
                             "username": "admin",
                             "first_name": "Eugeny",
                             "last_name": "Petrov",
-                            "avatar_url": "https://media.licdn.com/...",
+                            "avatar_url": "https://media.licdn.com/... ",
                             "linkedin_id": "E0P1gsNdct",
                             "date_joined": "2025-06-18T20:14:24.484568Z"
                         }
