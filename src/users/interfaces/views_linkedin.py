@@ -38,7 +38,8 @@ class LinkedInLoginView(APIView):
 @extend_schema(
     tags=['Users'],
     responses={
-        302: None,
+        302: OpenApiResponse(description='Redirect to frontend signin on cancel'),
+        200: None,
         500: OpenApiResponse(
             description='LinkedIn token exchange failed on server side',
             examples=[
@@ -56,17 +57,14 @@ class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Якщо вже залогінені через параметр logged_in
         if request.GET.get("logged_in") == "true":
             return Response({"logged_in": True}, status=status.HTTP_200_OK)
 
         code = request.GET.get("code")
         error = request.GET.get("error")
-
-        # При натисканні кнопки "Cancel" у LinkedIn прийде error або відсутній code
         if error or not code:
-            frontend_signup = settings.FRONTEND_URL.rstrip('/') + '/sign-up'
-            return redirect(frontend_signup)
+            frontend = settings.FRONTEND_URL.rstrip('/')
+            return redirect(f"{frontend}/sign-up")
 
         base = settings.BACKEND_BASE_URL.rstrip('/')
         redirect_uri = f"{base}/api/users/linkedin/callback/"
@@ -147,10 +145,9 @@ class LinkedInProfileView(APIView):
     def post(self, request):
         access_token = request.data.get("access_token")
         if not access_token:
-            return Response({"error": "Access token is required."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            frontend = settings.FRONTEND_URL.rstrip('/')
+            return redirect(f"{frontend}/signin")
 
-        # 1. Запрашиваем профиль у LinkedIn
         headers = {"Authorization": f"Bearer {access_token}"}
         resp = requests.get("https://api.linkedin.com/v2/userinfo", headers=headers, timeout=10)
         try:
@@ -169,7 +166,6 @@ class LinkedInProfileView(APIView):
         last_name = data.get("family_name", "")
         avatar = data.get("picture", "")
 
-        # 2. Пытаемся update_or_create только по linkedin_id
         defaults = {
             'email': email,
             'username': email.split('@')[0],
@@ -182,8 +178,7 @@ class LinkedInProfileView(APIView):
                 linkedin_id=linkedin_id,
                 defaults=defaults
             )
-        except IntegrityError as e:
-            logger.warning("LinkedIn create failed, merging existing user: %s", e)
+        except IntegrityError:
             user = User.objects.get(email__iexact=email)
             user.linkedin_id = linkedin_id
             user.first_name = first_name
@@ -191,7 +186,6 @@ class LinkedInProfileView(APIView):
             user.avatar_url = avatar
             user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
 
-        # 3. Возвращаем токен и профиль
         token_obj, _ = Token.objects.get_or_create(user=user)
         return Response({
             'token': token_obj.key,

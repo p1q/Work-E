@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 @extend_schema(
     tags=['Users'],
+    request=GoogleAuthSerializer,
     responses={
         200: OpenApiResponse(
             description='Successful login via Google',
@@ -37,9 +38,7 @@ logger = logging.getLogger(__name__)
                 )
             ]
         ),
-        302: OpenApiResponse(
-            description='Redirect to frontend sign-up on cancel or missing token'
-        ),
+        302: OpenApiResponse(description='Redirect to frontend signin on cancel or missing token'),
         400: OpenApiResponse(
             description='Invalid or malformed Google ID token',
             examples=[
@@ -57,8 +56,7 @@ logger = logging.getLogger(__name__)
                 ),
             ]
         )
-    },
-    request=GoogleAuthSerializer,
+    }
 )
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
