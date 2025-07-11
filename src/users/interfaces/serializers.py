@@ -95,8 +95,3 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid credentials.")
         data['user'] = user
         return data
-
-
-class LinkedInProfileResponseSerializer(serializers.Serializer):
-    token = serializers.CharField(help_text="Token for authenticated user")
-    user = UserSerializer(help_text="Дані користувача після входу через LinkedIn")

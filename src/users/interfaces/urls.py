@@ -9,7 +9,6 @@ from users.interfaces.views_google import GoogleLoginView
 from users.interfaces.views_linkedin import (
     LinkedInLoginView,
     LinkedInCallbackView,
-    LinkedInProfileView,
 )
 from users.interfaces.views_auth import LogoutView
 
@@ -23,7 +22,6 @@ urlpatterns = [
 
     path('linkedin/login/', LinkedInLoginView.as_view(), name='linkedin-login'),
     path('linkedin/callback/', LinkedInCallbackView.as_view(), name='linkedin-callback'),
-    path('linkedin/profile/', LinkedInProfileView.as_view(), name='linkedin-profile'),
 
     path('logout/', LogoutView.as_view(), name='logout'),
 ]
