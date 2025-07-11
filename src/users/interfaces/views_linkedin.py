@@ -1,22 +1,28 @@
 import logging
-import requests
-from urllib.parse import urlparse
 
+import requests
 from django.conf import settings
-from django.shortcuts import redirect
 from django.db import IntegrityError
+from django.shortcuts import redirect
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.authtoken.models import Token
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
-
-from .linkedin_oauth import LinkedInOAuthService
+from shared.auth.service import AuthService
 from users.infrastructure.models import User
 from users.interfaces.serializers import LinkedInProfileResponseSerializer
 
+from .linkedin_oauth import LinkedInOAuthService
+
 logger = logging.getLogger(__name__)
+
+
+def get_frontend_origin(request):
+    if settings.FRONTEND_URL:
+        return settings.FRONTEND_URL.rstrip('/')
+    return request.build_absolute_uri('/').rstrip('/')
 
 
 @extend_schema(
@@ -69,25 +75,69 @@ class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        frontend = get_frontend_origin(request)
+
         if request.GET.get("logged_in") == "true":
-            return Response({"logged_in": True}, status=status.HTTP_200_OK)
+            return redirect(f"{frontend}/")
 
         code = request.GET.get("code")
         error = request.GET.get("error")
         if error or not code:
-            parsed = urlparse(settings.FRONTEND_URL)
-            origin = f"{parsed.scheme}://{parsed.netloc}"
-            return redirect(f"{origin}/sign-up")
+            return redirect(f"{frontend}/sign-up")
 
         base = settings.BACKEND_BASE_URL.rstrip('/')
         redirect_uri = f"{base}/api/users/linkedin/callback/"
-
-        token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
-        if not token:
+        access_token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
+        if not access_token:
             logger.error("LinkedIn token exchange failed")
-            return Response({"error": "token_failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return redirect(f"{frontend}/login?error=token_failed")
 
-        return Response({"logged_in": True, "access_token": token}, status=status.HTTP_200_OK)
+        headers = {"Authorization": f"Bearer {access_token}"}
+        linkedin_resp = requests.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers=headers,
+            timeout=10
+        )
+        try:
+            profile = linkedin_resp.json()
+        except ValueError:
+            logger.error("Invalid JSON from LinkedIn userinfo")
+            return redirect(f"{frontend}/login?error=invalid_profile")
+        if linkedin_resp.status_code != 200:
+            logger.error("LinkedIn userinfo error: %s", profile)
+            return redirect(f"{frontend}/login?error=profile_failed")
+
+        linkedin_id = profile.get("sub")
+        email = profile.get("email")
+        first_name = profile.get("given_name", "")
+        last_name = profile.get("family_name", "")
+        avatar = profile.get("picture", "")
+
+        defaults = {
+            'email': email,
+            'username': email.split('@')[0],
+            'first_name': first_name,
+            'last_name': last_name,
+            'avatar_url': avatar,
+        }
+        try:
+            user, created = User.objects.update_or_create(
+                linkedin_id=linkedin_id,
+                defaults=defaults
+            )
+        except IntegrityError as e:
+            logger.warning("LinkedIn create failed, merging existing user: %s", e)
+            user = User.objects.get(email__iexact=email)
+            user.linkedin_id = linkedin_id
+            user.first_name = first_name
+            user.last_name = last_name
+            user.avatar_url = avatar
+            user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
+
+        tokens = AuthService.create_jwt_for_user(user)
+        response = redirect(f"{frontend}/")
+        AuthService.attach_jwt_cookies(response, tokens)
+        return response
 
 
 @extend_schema(
@@ -162,7 +212,11 @@ class LinkedInProfileView(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         headers = {"Authorization": f"Bearer {access_token}"}
-        resp = requests.get("https://api.linkedin.com/v2/userinfo", headers=headers, timeout=10)
+        resp = requests.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers=headers,
+            timeout=10
+        )
         try:
             data = resp.json()
         except ValueError:

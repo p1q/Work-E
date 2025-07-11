@@ -15,23 +15,21 @@
       font-size: 1.5rem;
       margin-bottom: 1rem;
     }
-    button, a.button {
+    button {
       display: inline-block;
       padding: 0.75rem 1.5rem;
       font-size: 1rem;
-      text-decoration: none;
       background: #0077b5;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
     }
-    button:hover, a.button:hover {
+    button:hover {
       background: #005983;
     }
     #message {
       margin-top: 1.5rem;
-      color: red;
       font-weight: bold;
     }
   </style>
@@ -45,43 +43,29 @@
   <div id="message"></div>
 
   <script>
-    const BACKEND = 'https://wq.work.gd';
+    const BACKEND_ORIGIN = window.location.origin;
 
-    // 1) При клике уходим на /api/users/linkedin/login/ бэкенда
+    // 1) При клике уходим на начало OAuth-флоу
     document.getElementById('login-btn').addEventListener('click', () => {
-      window.location.href = `${BACKEND}/api/users/linkedin/login/`;
+      window.location.href = `${BACKEND_ORIGIN}/api/users/linkedin/login/`;
     });
 
-    // 2) После редиректа из бэка, проверяем query-параметры и, если logged_in, запрашиваем профиль
-    document.addEventListener('DOMContentLoaded', async () => {
+    // 2) При возврате из LinkedIn показываем статус по наличию ?code или ?error
+    window.addEventListener('DOMContentLoaded', () => {
       const params = new URLSearchParams(window.location.search);
-      const error = params.get('error');
-      const loggedIn = params.get('logged_in');
+      const msgEl = document.getElementById('message');
 
-      if (error) {
-        // Показываем ошибку из бэка
-        document.getElementById('message').textContent =
-          'Помилка авторизації: ' + error;
+      // Если нет ни code, ни error — ещё не логинились, просто тихо выходим
+      if (!params.has('code') && !params.has('error')) {
         return;
       }
 
-      if (loggedIn) {
-        // Успешно залогинились — делаем авторизованный запрос за профилем
-        try {
-          const resp = await fetch(`${BACKEND}/api/users/me/`, {
-            credentials: 'include'
-          });
-          if (!resp.ok) {
-            throw new Error(`HTTP ${resp.status}`);
-          }
-          const user = await resp.json();
-          document.getElementById('message').style.color = 'green';
-          document.getElementById('message').textContent =
-            `Привіт, ${user.first_name || user.email}! Ви успішно увійшли.`;
-        } catch (e) {
-          document.getElementById('message').textContent =
-            'Не вдалося отримати дані користувача: ' + e.message;
-        }
+      if (params.get('error')) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = `Помилка авторизації: ${params.get('error')}`;
+      } else {
+        msgEl.style.color = 'green';
+        msgEl.textContent = 'Успішний вхід через LinkedIn!';
       }
     });
   </script>
