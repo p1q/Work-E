@@ -6,7 +6,6 @@ from django.db import IntegrityError
 from django.shortcuts import redirect
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from rest_framework import status
-from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -46,7 +45,9 @@ class LinkedInLoginView(APIView):
 @extend_schema(
     tags=['Users'],
     responses={
-        302: None,
+        302: OpenApiResponse(
+            description="Redirects to frontend on successful LinkedIn OAuth authentication"
+        ),
         400: OpenApiResponse(
             description='Authentication failed due to missing/invalid code or error from provider',
             examples=[
@@ -180,25 +181,21 @@ class LinkedInCallbackView(APIView):
         ),
         400: OpenApiResponse(
             description='Access token missing or invalid request format',
-            examples=[
-                OpenApiExample(
-                    name='No token provided',
-                    summary='Missing access_token in body',
-                    value={'error': 'Access token is required.'},
-                    response_only=True
-                )
-            ]
+            examples=[OpenApiExample(
+                name='No token provided',
+                summary='Missing access_token in body',
+                value={'error': 'Access token is required.'},
+                response_only=True
+            )]
         ),
         502: OpenApiResponse(
             description='Bad gateway — invalid JSON from LinkedIn',
-            examples=[
-                OpenApiExample(
-                    name='Invalid JSON',
-                    summary='LinkedIn returned non-JSON body',
-                    value={'error': 'Invalid JSON from LinkedIn', 'details': '<raw body>'},
-                    response_only=True
-                )
-            ]
+            examples=[OpenApiExample(
+                name='Invalid JSON',
+                summary='LinkedIn returned non-JSON body',
+                value={'error': 'Invalid JSON from LinkedIn', 'details': '<raw body>'},
+                response_only=True
+            )]
         )
     }
 )
