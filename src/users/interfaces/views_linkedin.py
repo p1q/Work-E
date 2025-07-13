@@ -2,7 +2,6 @@ import logging
 
 import requests
 from django.conf import settings
-from django.db import IntegrityError
 from django.shortcuts import redirect
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from rest_framework.permissions import AllowAny
@@ -16,9 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 def get_frontend_origin(request):
-    if settings.FRONTEND_URL:
-        return settings.FRONTEND_URL.rstrip('/')
-    return request.build_absolute_uri('/').rstrip('/')
+    origin = request.headers.get("Origin")
+    if origin:
+        return origin.rstrip("/")
+
+    referer = request.headers.get("Referer")
+    if referer:
+        from urllib.parse import urlparse
+        parsed = urlparse(referer)
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return request.build_absolute_uri("/").rstrip("/")
 
 
 @extend_schema(
@@ -123,7 +129,7 @@ class LinkedInCallbackView(APIView):
                 linkedin_id=linkedin_id,
                 defaults=defaults
             )
-        except IntegrityError as e:
+        except Exception as e:
             logger.warning("LinkedIn create failed, merging existing user: %s", e)
             user = User.objects.get(email__iexact=email)
             user.linkedin_id = linkedin_id
