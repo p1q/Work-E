@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from urllib.parse import urlparse
 from django.conf import settings
 from django.shortcuts import redirect
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
@@ -21,7 +22,6 @@ def get_frontend_origin(request):
 
     referer = request.headers.get("Referer")
     if referer:
-        from urllib.parse import urlparse
         parsed = urlparse(referer)
         return f"{parsed.scheme}://{parsed.netloc}"
     return request.build_absolute_uri("/").rstrip("/")
@@ -35,6 +35,9 @@ class LinkedInLoginView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        origin = get_frontend_origin(request)
+        request.session['oauth_frontend_origin'] = origin
+
         state, _ = LinkedInOAuthService.generate_pkce_and_state(request)
         base = settings.BACKEND_BASE_URL.rstrip('/')
         redirect_uri = f"{base}/api/users/linkedin/callback/"
@@ -79,7 +82,7 @@ class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        frontend = get_frontend_origin(request)
+        frontend = request.session.pop('oauth_frontend_origin', None) or get_frontend_origin(request)
 
         if request.GET.get("logged_in") == "true":
             return redirect(f"{frontend}/")
