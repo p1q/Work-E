@@ -18,8 +18,8 @@ class AuthService:
             tokens["access"],
             secure=True,
             httponly=True,
-            samesite="Strict",
-            max_age=settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds(),
+            samesite="None",
+            max_age=int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds()),
         )
 
         response.set_cookie(
@@ -27,8 +27,8 @@ class AuthService:
             tokens["refresh"],
             secure=True,
             httponly=True,
-            samesite="Strict",
-            max_age=settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds(),
+            samesite="None",
+            max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
         )
 
     @staticmethod
