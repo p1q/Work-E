@@ -11,12 +11,16 @@ class LogoutView(APIView):
 
     def post(self, request):
         refresh_token = request.COOKIES.get("refresh_token")
+
         if refresh_token:
             try:
                 RefreshToken(refresh_token).blacklist()
             except Exception:
                 pass
 
-        resp = Response(status=status.HTTP_204_NO_CONTENT)
-        AuthService.clear_jwt_cookies(resp)
-        return resp
+        response = Response(
+            {"detail": "Logout successful"},
+            status=status.HTTP_200_OK
+        )
+        AuthService.clear_jwt_cookies(response)
+        return response
