@@ -9,6 +9,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from shared.auth.service import AuthService
 from users.infrastructure.models import User
+from users.interfaces.serializers import UserSerializer
 
 from .linkedin_oauth import LinkedInOAuthService
 
@@ -52,18 +53,18 @@ class LinkedInLoginView(APIView):
     tags=['Users'],
     responses={
         302: OpenApiResponse(
-            description="Redirects to frontend on successful LinkedIn OAuth authentication"
+            description="Redirects to frontend callback after successful LinkedIn OAuth"
         ),
         400: OpenApiResponse(
-            description='Authentication failed due to missing/invalid code or error from provider',
+            description="OAuth failed",
             examples=[
                 OpenApiExample(
                     name='Missing code',
                     summary='User cancelled login',
                     value={},
                     response_only=True,
-                ),
-            ]
+                )
+            ],
         ),
         500: OpenApiResponse(
             description='LinkedIn token exchange failed on server side',
@@ -74,7 +75,7 @@ class LinkedInLoginView(APIView):
                     value={'error': 'token_failed'},
                     response_only=True
                 )
-            ]
+            ],
         )
     }
 )
@@ -127,6 +128,7 @@ class LinkedInCallbackView(APIView):
             'last_name': last_name,
             'avatar_url': avatar,
         }
+
         try:
             user, created = User.objects.update_or_create(
                 linkedin_id=linkedin_id,
@@ -142,6 +144,20 @@ class LinkedInCallbackView(APIView):
             user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
 
         tokens = AuthService.create_jwt_for_user(user)
-        response = redirect(f"{frontend}/")
+        response = redirect(f"{frontend}/linkedin/callback")
         AuthService.attach_jwt_cookies(response, tokens)
         return response
+
+
+@extend_schema(
+    tags=["Users"],
+    responses={200: UserSerializer}
+)
+class LinkedInProfileView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        if not request.user or request.user.is_anonymous:
+            return Response({"detail": "Unauthorized"}, status=401)
+
+        return Response(UserSerializer(request.user).data)
