@@ -81,7 +81,6 @@ class LinkedInCallbackView(APIView):
         logger.debug(f"Query params: {params}")
         logger.debug(f"Request Cookies: {dict(request.COOKIES)}")
 
-        # Пользователь уже залогинен
         if params.get("logged_in") == "true":
             logger.debug("Already logged in, redirect to frontend root")
             response = redirect(f"{frontend}/")
@@ -172,7 +171,7 @@ class LinkedInCallbackView(APIView):
         logger.debug("JWT cookies set on response")
         logger.debug(f"Response status: {response.status_code}")
         logger.debug(f"Response headers: {dict(response.items())}")
-        logger.debug(f"Response Cookies: {response.cookies.get_dict()}")
+        logger.debug(f"Response Cookies: {dict(response.cookies)}")
         return response
 
 
