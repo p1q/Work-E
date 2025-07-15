@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+</head>
+
+<body>
+  <button id="login-btn">Увійти через LinkedIn</button>
+
+  <script>
+    (() => {
+      const BACKEND = 'https://wq.work.gd';
+      document.getElementById('login-btn').addEventListener('click', () => {
+        window.location.href = `${BACKEND}/api/users/linkedin/login/`;
+      });
+    })();
+  </script>
+  
+</body>
+</html>

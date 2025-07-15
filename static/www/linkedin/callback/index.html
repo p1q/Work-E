@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+</head>
+<body>
+  <div id="user-info">
+    <h2>Користувач info</h2>
+    <p><strong>ID:</strong> <span id="uid"></span></p>
+    <p><strong>Email:</strong> <span id="uemail"></span></p>
+    <p><strong>Ім’я:</strong> <span id="ufirst"></span></p>
+    <p><strong>Прізвище:</strong> <span id="ulast"></span></p>
+    <p><strong>Username:</strong> <span id="uuname"></span></p>
+  </div>
+
+  <script>
+    (function() {
+      const BACKEND = 'https://wq.work.gd';
+      const msgEl = document.getElementById('message');
+      const infoEl = document.getElementById('user-info');
+
+      fetch(`${BACKEND}/api/users/current/`, {
+        credentials: 'include'
+      })
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error(`HTTP ${res.status}`);
+      })
+      .then(user => {
+        infoEl.style.display = 'block';
+        document.getElementById('uid').textContent    = user.id;
+        document.getElementById('uemail').textContent = user.email;
+        document.getElementById('ufirst').textContent = user.first_name;
+        document.getElementById('ulast').textContent  = user.last_name;
+        document.getElementById('uuname').textContent = user.username;
+      })
+      .catch(err => {
+        msgEl.textContent = 'Помилка: ' + err.message;
+      });
+    })();
+  </script>
+
+</body>
+</html>
