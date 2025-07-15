@@ -124,7 +124,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "https://work-e.netlify.app",
     "https://stage--work-e.netlify.app",
-    "https://localhost:3000",
+    "https://localhost:3001",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
