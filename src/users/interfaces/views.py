@@ -121,4 +121,6 @@ class CurrentUserView(APIView):
         logger.debug(f"Cookies content: {dict(request.COOKIES)}")
         logger.debug(f"User: {request.user} (id={request.user.id})")
 
-        return Response(UserSerializer(request.user).data)
+        response = Response(UserSerializer(request.user).data)
+        logger.debug(f"Response status: {response.status_code}")
+        return response
