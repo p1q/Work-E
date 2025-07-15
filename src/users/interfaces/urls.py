@@ -4,6 +4,7 @@ from users.interfaces.views import (
     UserRetrieveUpdateDestroyView,
     RegisterView,
     LoginView,
+    CurrentUserView,
 )
 from users.interfaces.views_google import GoogleLoginView
 from users.interfaces.views_linkedin import (
@@ -17,6 +18,7 @@ urlpatterns = [
     path('<int:pk>/', UserRetrieveUpdateDestroyView.as_view(), name='user-detail'),
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
+    path('current/', CurrentUserView.as_view(), name='current-user'),
 
     path('google/login/', GoogleLoginView.as_view(), name='google-login'),
 
