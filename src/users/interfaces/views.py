@@ -8,6 +8,7 @@ from drf_spectacular.utils import extend_schema, OpenApiExample
 
 from users.infrastructure.models import User
 from users.interfaces.serializers import UserSerializer, RegisterSerializer, LoginSerializer
+import logging
 
 
 @extend_schema(
@@ -67,19 +68,13 @@ class RegisterView(APIView):
             except IntegrityError as e:
                 err = str(e).lower()
                 if 'username' in err:
-                    return Response(
-                        {'username': ['A user with that username already exists.']},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    return Response({'username': ['A user with that username already exists.']},
+                                    status=status.HTTP_400_BAD_REQUEST)
                 if 'email' in err:
-                    return Response(
-                        {'email': ['A user with that email already exists.']},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                return Response(
-                    {'detail': 'Could not create user due to database error.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                    return Response({'email': ['A user with that email already exists.']},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                return Response({'detail': 'Could not create user due to database error.'},
+                                status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -108,4 +103,16 @@ class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        logger = logging.getLogger('linkedin')
+        logger.debug(f"Accessing /current for user: {request.user.email}")
+        return Response(UserSerializer(request.user).data)
+
+
+class CurrentUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        logger = logging.getLogger('linkedin')
+        logger.debug(f"Accessing /current for user: {request.user.email}")
+        logger.debug(f"Cookies: {dict(request.COOKIES)}")
         return Response(UserSerializer(request.user).data)
