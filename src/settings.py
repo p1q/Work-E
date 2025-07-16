@@ -125,6 +125,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://work-e.netlify.app",
     "https://stage--work-e.netlify.app",
     "https://localhost:3001",
+    "https://fk.onua.edu.ua",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
