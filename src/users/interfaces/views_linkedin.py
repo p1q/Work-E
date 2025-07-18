@@ -13,6 +13,7 @@ from .linkedin_oauth import LinkedInOAuthService
 
 logger = logging.getLogger(__name__)
 
+
 def get_frontend_origin(request):
     origin = request.headers.get("Origin")
     if origin:
@@ -22,6 +23,7 @@ def get_frontend_origin(request):
         parsed = urlparse(referer)
         return f"{parsed.scheme}://{parsed.netloc}"
     return request.build_absolute_uri("/").rstrip("/")
+
 
 @extend_schema(tags=['Users'], responses={302: None})
 class LinkedInLoginView(APIView):
@@ -33,7 +35,6 @@ class LinkedInLoginView(APIView):
         origin = get_frontend_origin(request)
         request.session['oauth_frontend_origin'] = origin
 
-        # Generate PKCE and state, log the state
         state, _ = LinkedInOAuthService.generate_pkce_and_state(request)
         logger.debug(f"Generated state for OAuth: {state}")
 
@@ -48,12 +49,16 @@ class LinkedInLoginView(APIView):
         logger.debug(f"Response headers: {dict(response.items())}")
         return response
 
+
 @extend_schema(
     tags=['Users'],
     responses={
         302: OpenApiResponse(description="Redirect after successful LinkedIn OAuth"),
-        400: OpenApiResponse(description="OAuth failed", examples=[OpenApiExample(name='Missing code', summary='User cancelled', value={}, response_only=True)]),
-        500: OpenApiResponse(description='Token exchange failed', examples=[OpenApiExample(name='Exchange error', summary='Token endpoint error', value={'error': 'token_failed'}, response_only=True)])
+        400: OpenApiResponse(description="OAuth failed", examples=[
+            OpenApiExample(name='Missing code', summary='User cancelled', value={}, response_only=True)]),
+        500: OpenApiResponse(description='Token exchange failed', examples=[
+            OpenApiExample(name='Exchange error', summary='Token endpoint error', value={'error': 'token_failed'},
+                           response_only=True)])
     }
 )
 class LinkedInCallbackView(APIView):
@@ -109,7 +114,8 @@ class LinkedInCallbackView(APIView):
         logger.debug(f"LinkedIn profile data received: {profile}")
 
         if linkedin_resp.status_code != 200:
-            logger.error(f"Error fetching user profile from LinkedIn: status={linkedin_resp.status_code}, message={linkedin_resp.text}")
+            logger.error(
+                f"Error fetching user profile from LinkedIn: status={linkedin_resp.status_code}, message={linkedin_resp.text}")
             response = redirect(f"{frontend}/login?error=profile_failed")
             return response
 
