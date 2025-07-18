@@ -146,6 +146,11 @@ class LinkedInCallbackView(APIView):
         tokens = AuthService.create_jwt_for_user(user)
         response = redirect(f"{frontend}/linkedin/callback")
         AuthService.attach_jwt_cookies(response, tokens)
+        origin = request.headers.get('Origin') or frontend
+        response["Access-Control-Allow-Origin"] = origin
+        response["Access-Control-Allow-Credentials"] = "true"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
         return response
 
 

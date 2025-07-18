@@ -1,3 +1,4 @@
+import os
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -13,25 +14,32 @@ class AuthService:
 
     @staticmethod
     def attach_jwt_cookies(response, tokens):
+        common = {
+            "secure": True,
+            "httponly": True,
+            "samesite": "None",
+        }
+
+        cookie_domain = os.getenv("COOKIE_DOMAIN")
+        if cookie_domain:
+            common["domain"] = cookie_domain
+
         response.set_cookie(
             "access_token",
             tokens["access"],
-            secure=True,
-            httponly=True,
-            samesite="None",
             max_age=int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds()),
+            **common
         )
 
         response.set_cookie(
             "refresh_token",
             tokens["refresh"],
-            secure=True,
-            httponly=True,
-            samesite="None",
             max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
+            **common
         )
 
     @staticmethod
     def clear_jwt_cookies(response):
-        response.delete_cookie("access_token")
-        response.delete_cookie("refresh_token")
+        domain = os.getenv("COOKIE_DOMAIN")
+        response.delete_cookie("access_token", domain=domain)
+        response.delete_cookie("refresh_token", domain=domain)

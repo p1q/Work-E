@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
+from corsheaders.defaults import default_methods, default_headers
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -127,6 +128,11 @@ CORS_ALLOWED_ORIGINS = [
     "https://localhost:3001",
 ]
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = list(default_methods)
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'access-control-allow-origin',
+    'access-control-allow-credentials',
+]
 
 # Cookie & CSRF
 SESSION_COOKIE_SECURE = True
