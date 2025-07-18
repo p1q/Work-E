@@ -155,7 +155,7 @@ LOGGING = {
         'linkedin_file': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': '/var/log/linkedin.log',
+            'filename': '/var/log/worke/linkedin.log',
             'formatter': 'verbose',
         },
     },
