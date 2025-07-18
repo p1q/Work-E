@@ -11,8 +11,6 @@ from users.infrastructure.models import User
 from users.interfaces.serializers import UserSerializer
 from .linkedin_oauth import LinkedInOAuthService
 
-logger = logging.getLogger(__name__)
-
 
 def get_frontend_origin(request):
     origin = request.headers.get("Origin")
@@ -30,19 +28,25 @@ class LinkedInLoginView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        logger.debug("LinkedInLoginView GET request received")
+        logger = logging.getLogger('linkedin')
 
         origin = get_frontend_origin(request)
         request.session['oauth_frontend_origin'] = origin
 
         state, _ = LinkedInOAuthService.generate_pkce_and_state(request)
-        logger.debug(f"Generated state for OAuth: {state}")
-
         base = settings.BACKEND_BASE_URL.rstrip('/')
         redirect_uri = f"{base}/api/users/linkedin/callback/"
-        authorization_url = LinkedInOAuthService.build_authorization_url(state=state, redirect_uri=redirect_uri)
+        authorization_url = LinkedInOAuthService.build_authorization_url(
+            state=state,
+            redirect_uri=redirect_uri
+        )
 
-        logger.debug(f"Redirecting to LinkedIn OAuth URL: {authorization_url}")
+        logger.debug("== LinkedInLoginView GET ==")
+        logger.debug(f"Origin header: {origin}")
+        logger.debug(f"Session state: {state}")
+        logger.debug(f"Redirect URI: {redirect_uri}")
+        logger.debug(f"Authorization URL: {authorization_url}")
+        logger.debug(f"Request Cookies: {dict(request.COOKIES)}")
 
         response = redirect(authorization_url)
         logger.debug(f"Response status: {response.status_code}")
@@ -55,48 +59,57 @@ class LinkedInLoginView(APIView):
     responses={
         302: OpenApiResponse(description="Redirect after successful LinkedIn OAuth"),
         400: OpenApiResponse(description="OAuth failed", examples=[
-            OpenApiExample(name='Missing code', summary='User cancelled', value={}, response_only=True)]),
+            OpenApiExample(name='Missing code', summary='User cancelled', value={}, response_only=True),
+        ]),
         500: OpenApiResponse(description='Token exchange failed', examples=[
-            OpenApiExample(name='Exchange error', summary='Token endpoint error', value={'error': 'token_failed'},
-                           response_only=True)])
+            OpenApiExample(name='Exchange error', summary='Token endpoint error',
+                           value={'error': 'token_failed'}, response_only=True),
+        ])
     }
 )
 class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        logger.debug("LinkedInCallbackView GET request received")
+        logger = logging.getLogger('linkedin')
 
         frontend = request.session.pop('oauth_frontend_origin', None) or get_frontend_origin(request)
         params = request.GET.dict()
 
+        logger.debug("== LinkedInCallbackView GET ==")
         logger.debug(f"Frontend origin: {frontend}")
-        logger.debug(f"Query parameters: {params}")
+        logger.debug(f"Query params: {params}")
+        logger.debug(f"Request Cookies: {dict(request.COOKIES)}")
 
         if params.get("logged_in") == "true":
-            logger.debug("User already logged in, redirecting to frontend root")
+            logger.debug("Already logged in, redirect to frontend root")
             response = redirect(f"{frontend}/")
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.items())}")
             return response
 
         code = params.get("code")
         error = params.get("error")
         if error or not code:
-            logger.warning(f"OAuth failed or missing code: error={error}")
+            logger.warning(f"OAuth cancelled or missing code: error={error}")
             response = redirect(f"{frontend}/sign-up")
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.items())}")
             return response
 
         base = settings.BACKEND_BASE_URL.rstrip('/')
         redirect_uri = f"{base}/api/users/linkedin/callback/"
-
-        logger.debug(f"Exchanging code at {redirect_uri}")
+        logger.debug(f"Exchanging code at redirect_uri: {redirect_uri}")
 
         access_token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
         if not access_token:
-            logger.error("Failed to exchange code for access token")
+            logger.error("Failed to obtain access token")
             response = redirect(f"{frontend}/login?error=token_failed")
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.items())}")
             return response
 
-        logger.debug("Access token obtained, making API request to LinkedIn")
+        logger.debug("Access token obtained")
 
         linkedin_resp = requests.get(
             "https://api.linkedin.com/v2/userinfo",
@@ -107,16 +120,19 @@ class LinkedInCallbackView(APIView):
         try:
             profile = linkedin_resp.json()
         except ValueError:
-            logger.error("Failed to parse LinkedIn user info response: invalid JSON")
+            logger.error("Invalid JSON from LinkedIn userinfo")
             response = redirect(f"{frontend}/login?error=invalid_profile")
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.items())}")
             return response
 
-        logger.debug(f"LinkedIn profile data received: {profile}")
+        logger.debug(f"LinkedIn profile data: {profile}")
 
         if linkedin_resp.status_code != 200:
-            logger.error(
-                f"Error fetching user profile from LinkedIn: status={linkedin_resp.status_code}, message={linkedin_resp.text}")
+            logger.error(f"LinkedIn userinfo error: status={linkedin_resp.status_code}")
             response = redirect(f"{frontend}/login?error=profile_failed")
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.items())}")
             return response
 
         linkedin_id = profile.get("sub")
@@ -140,7 +156,7 @@ class LinkedInCallbackView(APIView):
             )
             logger.debug(f"User {'created' if created else 'updated'}: {user.email}")
         except Exception as e:
-            logger.warning(f"Failed to create or update user: {e}, merging with existing user")
+            logger.warning(f"Update or create failed: {e}, merging existing user")
             user = User.objects.get(email__iexact=email)
             user.linkedin_id = linkedin_id
             user.first_name = first_name
@@ -155,7 +171,7 @@ class LinkedInCallbackView(APIView):
         logger.debug("JWT cookies set on response")
         logger.debug(f"Response status: {response.status_code}")
         logger.debug(f"Response headers: {dict(response.items())}")
-        logger.debug(f"Response cookies: {dict(response.cookies)}")
+        logger.debug(f"Response Cookies: {dict(response.cookies)}")
         return response
 
 
