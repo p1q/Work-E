@@ -142,32 +142,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '[{asctime}] {levelname} {name}: {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'linkedin_file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': '/var/log/worke/linkedin.log',
-            'formatter': 'verbose',
-        },
-    },
-    'loggers': {
-        'linkedin': {
-            'handlers': ['linkedin_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-    },
-}
-
 # Статика и медиа
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
