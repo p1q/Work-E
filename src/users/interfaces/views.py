@@ -113,12 +113,6 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         logger = logging.getLogger('linkedin')
-        logger.debug("========== /api/users/current/ ==========")
-        logger.debug(f"Method: {request.method}")
-        logger.debug(f"Path: {request.get_full_path()}")
-        logger.debug(f"Headers: {dict(request.headers)}")
-        logger.debug(f"Cookies present: {'YES' if request.COOKIES else 'NO'}")
-        logger.debug(f"Cookies content: {dict(request.COOKIES)}")
-        logger.debug(f"User: {request.user} (id={request.user.id})")
-
+        logger.debug(f"Accessing /current for user: {request.user.email}")
+        logger.debug(f"Cookies: {dict(request.COOKIES)}")
         return Response(UserSerializer(request.user).data)
