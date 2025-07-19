@@ -89,7 +89,6 @@ class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Log incoming params for debugging
         logger.debug("LinkedInCallbackView GET params: %s", request.GET.dict())
 
         try:
@@ -101,27 +100,27 @@ class LinkedInCallbackView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Exchange code for LinkedIn access token
             base = settings.BACKEND_BASE_URL.rstrip('/')
             redirect_uri = f"{base}/api/users/linkedin/callback/"
             linkedin_token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
+
             if not linkedin_token:
                 logger.error("LinkedIn token exchange returned None")
                 return Response(
-                    {'error': 'token_failed'},
+                    {'error': 'linkedin_token_exchange_failed'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
-            # Fetch user profile from LinkedIn
             resp = requests.get(
                 "https://api.linkedin.com/v2/userinfo",
                 headers={"Authorization": f"Bearer {linkedin_token}"},
                 timeout=10
             )
+
             if resp.status_code != 200:
                 logger.error("LinkedIn userinfo error: %s", resp.text)
                 return Response(
-                    {'error': 'profile_failed'},
+                    {'error': 'linkedin_profile_failed'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
@@ -146,18 +145,25 @@ class LinkedInCallbackView(APIView):
                     defaults=defaults
                 )
             except Exception as e:
-                logger.warning("Update_or_create failed, merging existing user: %s", e)
-                user = User.objects.get(email__iexact=email)
-                user.linkedin_id = linkedin_id
-                user.first_name = first_name
-                user.last_name = last_name
-                user.avatar_url = avatar
-                user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
+                logger.warning("update_or_create failed, fallback merge: %s", e)
+                try:
+                    user = User.objects.get(email__iexact=email)
+                    user.linkedin_id = linkedin_id
+                    user.first_name = first_name
+                    user.last_name = last_name
+                    user.avatar_url = avatar
+                    user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
+                except User.DoesNotExist:
+                    logger.error("User with email %s not found for fallback merge", email)
+                    return Response({'error': 'user_not_found'}, status=500)
 
-            # Generate JWT tokens
             tokens = AuthService.create_jwt_for_user(user)
 
-
+            return Response({
+                'access': tokens['access'],
+                'refresh': tokens['refresh'],
+                'user': UserSerializer(user).data
+            }, status=status.HTTP_200_OK)
 
         except Exception as exc:
             logger.exception("Unexpected error in LinkedInCallbackView")
