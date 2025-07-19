@@ -89,71 +89,79 @@ class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Проверяем код/ошибку
-        error = request.GET.get("error")
-        code = request.GET.get("code")
-        if error or not code:
-            return Response({'detail': 'OAuth failed or cancelled'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Меняем код на LinkedIn access token
-        base = settings.BACKEND_BASE_URL.rstrip('/')
-        redirect_uri = f"{base}/api/users/linkedin/callback/"
-        linkedin_token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
-        if not linkedin_token:
-            logger.error("LinkedIn token exchange failed")
-            return Response({'error': 'token_failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # Получаем профиль LinkedIn
-        resp = requests.get(
-            "https://api.linkedin.com/v2/userinfo",
-            headers={"Authorization": f"Bearer {linkedin_token}"},
-            timeout=10
-        )
-        if resp.status_code != 200:
-            logger.error("LinkedIn userinfo error: %s", resp.text)
-            return Response({'error': 'profile_failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        profile = resp.json()
-        linkedin_id = profile.get("sub")
-        email = profile.get("email")
-        first_name = profile.get("given_name", "")
-        last_name = profile.get("family_name", "")
-        avatar = profile.get("picture", "")
-
-        defaults = {
-            'email': email,
-            'username': email.split('@')[0],
-            'first_name': first_name,
-            'last_name': last_name,
-            'avatar_url': avatar,
-        }
+        # Log incoming params for debugging
+        logger.debug("LinkedInCallbackView GET params: %s", request.GET.dict())
 
         try:
-            user, created = User.objects.update_or_create(
-                linkedin_id=linkedin_id,
-                defaults=defaults
+            error = request.GET.get("error")
+            code = request.GET.get("code")
+            if error or not code:
+                return Response(
+                    {'detail': 'OAuth failed or cancelled'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Exchange code for LinkedIn access token
+            base = settings.BACKEND_BASE_URL.rstrip('/')
+            redirect_uri = f"{base}/api/users/linkedin/callback/"
+            linkedin_token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
+            if not linkedin_token:
+                logger.error("LinkedIn token exchange returned None")
+                return Response(
+                    {'error': 'token_failed'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            # Fetch user profile from LinkedIn
+            resp = requests.get(
+                "https://api.linkedin.com/v2/userinfo",
+                headers={"Authorization": f"Bearer {linkedin_token}"},
+                timeout=10
             )
-        except Exception as e:
-            logger.warning("LinkedIn create failed, merging existing user: %s", e)
-            user = User.objects.get(email__iexact=email)
-            user.linkedin_id = linkedin_id
-            user.first_name = first_name
-            user.last_name = last_name
-            user.avatar_url = avatar
-            user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
+            if resp.status_code != 200:
+                logger.error("LinkedIn userinfo error: %s", resp.text)
+                return Response(
+                    {'error': 'profile_failed'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
-        # Генерируем JWT
-        tokens = AuthService.create_jwt_for_user(user)
+            profile = resp.json()
+            linkedin_id = profile.get("sub")
+            email = profile.get("email")
+            first_name = profile.get("given_name", "")
+            last_name = profile.get("family_name", "")
+            avatar = profile.get("picture", "")
 
-@extend_schema(
-    tags=["Users"],
-    responses={200: UserSerializer}
-)
-class LinkedInProfileView(APIView):
-    permission_classes = [AllowAny]
+            defaults = {
+                'email': email,
+                'username': email.split('@')[0],
+                'first_name': first_name,
+                'last_name': last_name,
+                'avatar_url': avatar,
+            }
 
-    def get(self, request):
-        if not request.user or request.user.is_anonymous:
-            return Response({"detail": "Unauthorized"}, status=401)
+            try:
+                user, created = User.objects.update_or_create(
+                    linkedin_id=linkedin_id,
+                    defaults=defaults
+                )
+            except Exception as e:
+                logger.warning("Update_or_create failed, merging existing user: %s", e)
+                user = User.objects.get(email__iexact=email)
+                user.linkedin_id = linkedin_id
+                user.first_name = first_name
+                user.last_name = last_name
+                user.avatar_url = avatar
+                user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
 
-        return Response(UserSerializer(request.user).data)
+            # Generate JWT tokens
+            tokens = AuthService.create_jwt_for_user(user)
+
+
+
+        except Exception as exc:
+            logger.exception("Unexpected error in LinkedInCallbackView")
+            return Response(
+                {'error': 'internal_error', 'detail': str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
