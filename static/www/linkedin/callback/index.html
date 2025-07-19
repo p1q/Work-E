@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LinkedIn Callback</title>
 </head>
 <body>
-  <div id="user-info">
-    <h2>Користувач info</h2>
+  <div id="message" style="color: red; font-weight: bold;"></div>
+
+  <div id="user-info" style="display: none;">
+    <h2>Інформація про користувача</h2>
     <p><strong>ID:</strong> <span id="uid"></span></p>
     <p><strong>Email:</strong> <span id="uemail"></span></p>
     <p><strong>Ім’я:</strong> <span id="ufirst"></span></p>
@@ -16,24 +19,39 @@
 
   <script>
     (function() {
-      const BACKEND = 'https://wq.work.gd';
+      const BACKEND = 'https://127.0.0.1:8000';
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const error = params.get('error');
       const msgEl = document.getElementById('message');
       const infoEl = document.getElementById('user-info');
 
-      fetch(`${BACKEND}/api/users/current/`, {
-        credentials: 'include'
+      if (error || !code) {
+        msgEl.textContent = 'OAuth не вдався або скасований.';
+        return;
+      }
+
+      // Обмін коду на JWT
+      fetch(`${BACKEND}/api/users/linkedin/callback/?code=${encodeURIComponent(code)}`, {
+        method: 'GET'
       })
       .then(res => {
-        if (res.ok) return res.json();
-        throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
       })
-      .then(user => {
-        infoEl.style.display = 'block';
+      .then(data => {
+        // Зберігаємо токени
+        localStorage.setItem('access_token', data.access);
+        localStorage.setItem('refresh_token', data.refresh);
+
+        // Відображаємо інформацію про користувача
+        const user = data.user;
         document.getElementById('uid').textContent    = user.id;
         document.getElementById('uemail').textContent = user.email;
         document.getElementById('ufirst').textContent = user.first_name;
         document.getElementById('ulast').textContent  = user.last_name;
         document.getElementById('uuname').textContent = user.username;
+        infoEl.style.display = 'block';
       })
       .catch(err => {
         msgEl.textContent = 'Помилка: ' + err.message;

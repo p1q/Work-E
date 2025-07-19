@@ -2,11 +2,17 @@ import logging
 
 import requests
 from urllib.parse import urlparse
+
 from django.conf import settings
 from django.shortcuts import redirect
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
-from rest_framework.permissions import AllowAny
+
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
+
 from shared.auth.service import AuthService
 from users.infrastructure.models import User
 from users.interfaces.serializers import UserSerializer
@@ -52,8 +58,8 @@ class LinkedInLoginView(APIView):
 @extend_schema(
     tags=['Users'],
     responses={
-        302: OpenApiResponse(
-            description="Redirects to frontend callback after successful LinkedIn OAuth"
+        200: OpenApiResponse(
+            description="Возвращает JSON с access и refresh токенами"
         ),
         400: OpenApiResponse(
             description="OAuth failed",
@@ -83,38 +89,31 @@ class LinkedInCallbackView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        frontend = request.session.pop('oauth_frontend_origin', None) or get_frontend_origin(request)
-
-        if request.GET.get("logged_in") == "true":
-            return redirect(f"{frontend}/")
-
-        code = request.GET.get("code")
+        # Проверяем код/ошибку
         error = request.GET.get("error")
+        code = request.GET.get("code")
         if error or not code:
-            return redirect(f"{frontend}/sign-up")
+            return Response({'detail': 'OAuth failed or cancelled'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Меняем код на LinkedIn access token
         base = settings.BACKEND_BASE_URL.rstrip('/')
         redirect_uri = f"{base}/api/users/linkedin/callback/"
-        access_token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
-        if not access_token:
+        linkedin_token = LinkedInOAuthService.exchange_code_for_token(code, redirect_uri)
+        if not linkedin_token:
             logger.error("LinkedIn token exchange failed")
-            return redirect(f"{frontend}/login?error=token_failed")
+            return Response({'error': 'token_failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        headers = {"Authorization": f"Bearer {access_token}"}
-        linkedin_resp = requests.get(
+        # Получаем профиль LinkedIn
+        resp = requests.get(
             "https://api.linkedin.com/v2/userinfo",
-            headers=headers,
+            headers={"Authorization": f"Bearer {linkedin_token}"},
             timeout=10
         )
-        try:
-            profile = linkedin_resp.json()
-        except ValueError:
-            logger.error("Invalid JSON from LinkedIn userinfo")
-            return redirect(f"{frontend}/login?error=invalid_profile")
-        if linkedin_resp.status_code != 200:
-            logger.error("LinkedIn userinfo error: %s", profile)
-            return redirect(f"{frontend}/login?error=profile_failed")
+        if resp.status_code != 200:
+            logger.error("LinkedIn userinfo error: %s", resp.text)
+            return Response({'error': 'profile_failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        profile = resp.json()
         linkedin_id = profile.get("sub")
         email = profile.get("email")
         first_name = profile.get("given_name", "")
@@ -143,16 +142,8 @@ class LinkedInCallbackView(APIView):
             user.avatar_url = avatar
             user.save(update_fields=['linkedin_id', 'first_name', 'last_name', 'avatar_url'])
 
+        # Генерируем JWT
         tokens = AuthService.create_jwt_for_user(user)
-        response = redirect(f"{frontend}/linkedin/callback")
-        AuthService.attach_jwt_cookies(response, tokens)
-        origin = request.headers.get('Origin') or frontend
-        response["Access-Control-Allow-Origin"] = origin
-        response["Access-Control-Allow-Credentials"] = "true"
-        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-        response["Access-Control-Allow-Headers"] = "Content-Type"
-        return response
-
 
 @extend_schema(
     tags=["Users"],
