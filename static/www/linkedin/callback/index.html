@@ -19,45 +19,36 @@
 
   <script>
     (function() {
-      const BACKEND = 'https://127.0.0.1:8000';
       const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const error = params.get('error');
       const msgEl = document.getElementById('message');
       const infoEl = document.getElementById('user-info');
 
-      if (error || !code) {
-        msgEl.textContent = 'OAuth не вдався або скасований.';
+      if (params.has('error')) {
+        msgEl.textContent = 'Помилка: ' + params.get('error');
         return;
       }
 
-      // Обмін коду на JWT
-      fetch(`${BACKEND}/api/users/linkedin/callback/?code=${encodeURIComponent(code)}`, {
-        method: 'GET'
-      })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        // Зберігаємо токени
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
+      // извлекаем токены
+      const access = params.get('access');
+      const refresh = params.get('refresh');
 
-        // Відображаємо інформацію про користувача
-        const user = data.user;
-        document.getElementById('uid').textContent    = user.id;
-        document.getElementById('uemail').textContent = user.email;
-        document.getElementById('ufirst').textContent = user.first_name;
-        document.getElementById('ulast').textContent  = user.last_name;
-        document.getElementById('uuname').textContent = user.username;
-        infoEl.style.display = 'block';
-      })
-      .catch(err => {
-        msgEl.textContent = 'Помилка: ' + err.message;
-      });
+      if (!access || !refresh) {
+        msgEl.textContent = 'Не отримано токени.';
+        return;
+      }
+
+      // сохраняем
+      localStorage.setItem('access_token', access);
+      localStorage.setItem('refresh_token', refresh);
+
+      // отображаем user-info
+      document.getElementById('uid').textContent    = params.get('uid');
+      document.getElementById('uemail').textContent = params.get('email');
+      document.getElementById('ufirst').textContent = params.get('first_name');
+      document.getElementById('ulast').textContent  = params.get('last_name');
+      document.getElementById('uuname').textContent = params.get('username');
+      infoEl.style.display = 'block';
     })();
   </script>
-
 </body>
 </html>
