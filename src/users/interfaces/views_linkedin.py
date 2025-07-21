@@ -48,10 +48,17 @@ class LinkedInLoginView(APIView):
     def post(self, request):
         serializer = LinkedInAuthSerializer(data=request.data)
         if serializer.is_valid():
-            result = serializer.save()
+            try:
+                result = serializer.save()
+            except serializers.ValidationError as e:
+                return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                logger.error(f"Unexpected error during LinkedIn authentication: {e}")
+                return Response({"detail": "An unexpected error occurred during LinkedIn authentication."},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
             user = result['user']
             token = result['token']
-
             return Response({
                 'token': token,
                 'user': {
@@ -64,6 +71,7 @@ class LinkedInLoginView(APIView):
                     'date_joined': user.date_joined,
                 }
             })
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
