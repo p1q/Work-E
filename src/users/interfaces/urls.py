@@ -21,9 +21,7 @@ urlpatterns = [
     path('current/', CurrentUserView.as_view(), name='current-user'),
 
     path('google/login/', GoogleLoginView.as_view(), name='google-login'),
-
     path('linkedin/login/', LinkedInLoginView.as_view(), name='linkedin-login'),
-    path('linkedin/callback/', LinkedInCallbackView.as_view(), name='linkedin-callback'),
 
     path('logout/', LogoutView.as_view(), name='logout'),
 ]

@@ -11,7 +11,6 @@ class GoogleAuthSerializer(serializers.Serializer):
 
     def validate_id_token(self, value):
         try:
-            # Добавляем clock_skew_in_seconds=15 для учёта погрешности ±15 секунд
             idinfo = id_token.verify_oauth2_token(
                 value,
                 requests.Request(),
@@ -20,8 +19,9 @@ class GoogleAuthSerializer(serializers.Serializer):
             )
         except ValueError as e:
             raise serializers.ValidationError(f"Invalid Google ID token: {e}")
+        except requests.exceptions.RequestException as e:
+            raise serializers.ValidationError(f"Network error during Google token validation: {e}")
 
-        # Проверяем, что в токене ожидаемый CLIENT_ID
         aud = idinfo.get('aud')
         valid_aud = settings.GOOGLE_CLIENT_ID
         if isinstance(aud, list):
@@ -41,7 +41,6 @@ class GoogleAuthSerializer(serializers.Serializer):
         last_name = info.get('family_name', '')
         avatar_url = info.get('picture', '')
 
-        # создаём или обновляем все поля разом
         user, _ = User.objects.update_or_create(
             email=email,
             defaults={
