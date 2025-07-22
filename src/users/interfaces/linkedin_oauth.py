@@ -24,9 +24,10 @@ class LinkedInOAuthService:
             "client_id": settings.LINKEDIN_CLIENT_ID,
             "redirect_uri": redirect_uri,
             "state": state,
-            "scope": "openid profile email",
+            "scope": "email profile",
         }
-        return f"{cls.AUTHORIZATION_URL}?{urlencode(params)}"
+        auth_url = f"{cls.AUTHORIZATION_URL}?{urlencode(params)}"
+        return auth_url
 
     @staticmethod
     def validate_state_and_get_verifier(request):

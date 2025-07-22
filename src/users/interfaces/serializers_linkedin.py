@@ -9,7 +9,7 @@ class LinkedInAuthSerializer(serializers.Serializer):
 
     def validate_access_token(self, value):
         try:
-            url = f"https://api.linkedin.com/v2/me"
+            url = "https://api.linkedin.com/v2/userinfo"
             headers = {
                 "Authorization": f"Bearer {value}",
             }
@@ -20,8 +20,8 @@ class LinkedInAuthSerializer(serializers.Serializer):
 
             linkedin_data = response.json()
 
-            if not linkedin_data.get('emailAddress'):
-                raise serializers.ValidationError("LinkedIn access token missing 'emailAddress' field.")
+            if not linkedin_data.get('email'):
+                raise serializers.ValidationError("LinkedIn access token missing 'email' field.")
             if not linkedin_data.get('id'):
                 raise serializers.ValidationError("LinkedIn access token missing 'id' field.")
             if 'localizedFirstName' not in linkedin_data or 'localizedLastName' not in linkedin_data:
@@ -36,14 +36,14 @@ class LinkedInAuthSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         linkedin_info = validated_data['access_token']
-        email = linkedin_info.get('emailAddress', '')
+        email = linkedin_info.get('email', '')
         linkedin_id = linkedin_info.get('id')
         first_name = linkedin_info.get('localizedFirstName', '')
         last_name = linkedin_info.get('localizedLastName', '')
         avatar_url = \
-            linkedin_info.get('profilePicture', {}).get('displayImage~', {}).get('elements', [{}])[0].get('identifiers',
-                                                                                                          [{}])[0].get(
-                'identifier', '')
+        linkedin_info.get('profilePicture', {}).get('displayImage~', {}).get('elements', [{}])[0].get('identifiers',
+                                                                                                      [{}])[0].get(
+            'identifier', '')
 
         user, _ = User.objects.update_or_create(
             linkedin_id=linkedin_id,
