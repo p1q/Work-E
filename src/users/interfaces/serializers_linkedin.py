@@ -5,9 +5,9 @@ from users.infrastructure.models import User
 
 
 class LinkedInAuthSerializer(serializers.Serializer):
-    id_token = serializers.CharField(write_only=True)
+    access_token = serializers.CharField(write_only=True)
 
-    def validate_id_token(self, value):
+    def validate_access_token(self, value):
         try:
             url = f"https://api.linkedin.com/v2/me"
             headers = {
@@ -16,16 +16,16 @@ class LinkedInAuthSerializer(serializers.Serializer):
             response = requests.get(url, headers=headers)
 
             if response.status_code != 200:
-                raise serializers.ValidationError(f"Invalid LinkedIn ID token: {response.text}")
+                raise serializers.ValidationError(f"Invalid LinkedIn access token: {response.text}")
 
             linkedin_data = response.json()
 
             if not linkedin_data.get('emailAddress'):
-                raise serializers.ValidationError("LinkedIn ID token missing 'emailAddress' field.")
+                raise serializers.ValidationError("LinkedIn access token missing 'emailAddress' field.")
             if not linkedin_data.get('id'):
-                raise serializers.ValidationError("LinkedIn ID token missing 'id' field.")
+                raise serializers.ValidationError("LinkedIn access token missing 'id' field.")
             if 'localizedFirstName' not in linkedin_data or 'localizedLastName' not in linkedin_data:
-                raise serializers.ValidationError("LinkedIn ID token missing 'firstName' or 'lastName' fields.")
+                raise serializers.ValidationError("LinkedIn access token missing 'firstName' or 'lastName' fields.")
 
         except requests.exceptions.RequestException as e:
             raise serializers.ValidationError(f"Network error during LinkedIn token validation: {e}")
@@ -35,7 +35,7 @@ class LinkedInAuthSerializer(serializers.Serializer):
         return linkedin_data
 
     def create(self, validated_data):
-        linkedin_info = validated_data['id_token']
+        linkedin_info = validated_data['access_token']
         email = linkedin_info.get('emailAddress', '')
         linkedin_id = linkedin_info.get('id')
         first_name = linkedin_info.get('localizedFirstName', '')

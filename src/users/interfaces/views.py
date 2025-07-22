@@ -1,11 +1,10 @@
 from django.db import IntegrityError
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import status, generics
-from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from drf_spectacular.utils import extend_schema, OpenApiExample
-
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from users.infrastructure.models import User
 from users.interfaces.serializers import UserSerializer, RegisterSerializer, LoginSerializer
 
@@ -108,4 +107,10 @@ class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        code = request.GET.get('code')
+        request.GET.get('state')
+
+        if not code:
+            return Response({'error': 'Missing code'}, status=400)
+
+        return redirect(settings.FRONTEND_URL)

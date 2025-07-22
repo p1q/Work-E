@@ -1,9 +1,11 @@
 import logging
-from rest_framework.views import APIView
-from rest_framework.response import Response
+
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from .serializers_linkedin import LinkedInAuthSerializer
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,7 @@ logger = logging.getLogger(__name__)
             examples=[OpenApiExample(
                 name='Invalid token',
                 summary='Token is invalid or malformed',
-                value={'detail': 'Invalid LinkedIn ID token: ...'}
+                value={'detail': 'Invalid LinkedIn access token: ...'}
             )]
         )
     }
