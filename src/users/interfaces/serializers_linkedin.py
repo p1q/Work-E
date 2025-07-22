@@ -20,12 +20,17 @@ class LinkedInAuthSerializer(serializers.Serializer):
 
             linkedin_data = response.json()
 
+            # Перевіряємо, що LinkedIn повернув внутрішній ідентифікатор 'sub'
+            if not linkedin_data.get('sub'):
+                raise serializers.ValidationError("LinkedIn response missing 'sub' field.")
+
+            # Перевіряємо наявність email
             if not linkedin_data.get('email'):
-                raise serializers.ValidationError("LinkedIn access token missing 'email' field.")
-            if not linkedin_data.get('id'):
-                raise serializers.ValidationError("LinkedIn access token missing 'id' field.")
-            if 'localizedFirstName' not in linkedin_data or 'localizedLastName' not in linkedin_data:
-                raise serializers.ValidationError("LinkedIn access token missing 'firstName' or 'lastName' fields.")
+                raise serializers.ValidationError("LinkedIn response missing 'email' field.")
+
+            # Перевіряємо наявність імені та прізвища
+            if 'given_name' not in linkedin_data or 'family_name' not in linkedin_data:
+                raise serializers.ValidationError("LinkedIn response missing 'given_name' or 'family_name' fields.")
 
         except requests.exceptions.RequestException as e:
             raise serializers.ValidationError(f"Network error during LinkedIn token validation: {e}")
@@ -37,13 +42,10 @@ class LinkedInAuthSerializer(serializers.Serializer):
     def create(self, validated_data):
         linkedin_info = validated_data['access_token']
         email = linkedin_info.get('email', '')
-        linkedin_id = linkedin_info.get('id')
-        first_name = linkedin_info.get('localizedFirstName', '')
-        last_name = linkedin_info.get('localizedLastName', '')
-        avatar_url = \
-        linkedin_info.get('profilePicture', {}).get('displayImage~', {}).get('elements', [{}])[0].get('identifiers',
-                                                                                                      [{}])[0].get(
-            'identifier', '')
+        linkedin_id = linkedin_info.get('sub')
+        first_name = linkedin_info.get('given_name', '')
+        last_name = linkedin_info.get('family_name', '')
+        avatar_url = linkedin_info.get('picture', '')
 
         user, _ = User.objects.update_or_create(
             linkedin_id=linkedin_id,

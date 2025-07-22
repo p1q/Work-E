@@ -24,7 +24,7 @@ class LinkedInOAuthService:
             "client_id": settings.LINKEDIN_CLIENT_ID,
             "redirect_uri": redirect_uri,
             "state": state,
-            "scope": "email profile",
+            "scope": "openid email profile",
         }
         auth_url = f"{cls.AUTHORIZATION_URL}?{urlencode(params)}"
         return auth_url
