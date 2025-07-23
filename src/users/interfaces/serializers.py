@@ -95,3 +95,21 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid credentials.")
         data['user'] = user
         return data
+
+
+class PatchUserSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(
+        max_length=30,
+        allow_blank=True,
+        validators=[sql_injection_validator]
+    )
+    last_name = serializers.CharField(
+        max_length=30,
+        allow_blank=True,
+        validators=[sql_injection_validator]
+    )
+    avatar_url = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'avatar_url']
