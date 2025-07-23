@@ -5,12 +5,13 @@ from django.conf import settings
 def validate_access_token(access_token):
     # 1) Перевірка токена
     tokeninfo_url = f"https://www.googleapis.com/oauth2/v3/tokeninfo?access_token={access_token}"
-    resp = requests.get(tokeninfo_url)
+    resp = requests.get(tokeninfo_url, timeout=5)
     if resp.status_code != 200:
         raise ValueError("Invalid or expired access token")
 
     data = resp.json()
-    if data.get('aud') != settings.GOOGLE_CLIENT_ID:
+    aud = data.get('aud') or data.get('audience')
+    if aud != settings.GOOGLE_CLIENT_ID:
         raise ValueError("Token audience mismatch")
 
     # 2) Запит повного профілю користувача
