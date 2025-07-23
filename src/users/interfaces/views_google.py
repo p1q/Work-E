@@ -1,8 +1,5 @@
 import logging
-from urllib.parse import urlparse
 
-from django.conf import settings
-from django.shortcuts import redirect
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,6 +7,9 @@ from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from .serializers_google import GoogleAuthSerializer
+from users.service import validate_access_token  # <- зміна імпорту
+from users.infrastructure.models import User
+from rest_framework.authtoken.models import Token
 
 logger = logging.getLogger(__name__)
 
@@ -20,42 +20,36 @@ logger = logging.getLogger(__name__)
     responses={
         200: OpenApiResponse(
             description='Successful login via Google',
-            examples=[
-                OpenApiExample(
-                    name='Приклад успішної відповіді',
-                    summary='Успішний вхід через Google',
-                    value={
-                        "token": "abc123def456",
-                        "user": {
-                            "id": 42,
-                            "email": "user@example.com",
-                            "username": "user42",
-                            "first_name": "John",
-                            "last_name": "Doe",
-                            "avatar_url": "https://lh3.googleusercontent.com/.../photo.jpg",
-                            "date_joined": "2025-07-01T14:30:00Z"
-                        }
-                    },
-                    response_only=True
-                )
-            ]
-        ),
-        302: OpenApiResponse(
-            description='Redirect to frontend sign-up on cancel or missing token'
+            examples=[OpenApiExample(
+                name='Приклад успішної відповіді',
+                summary='Успішний вхід через Google',
+                value={
+                    "token": "abc123def456",
+                    "user": {
+                        "id": 42,
+                        "email": "user@example.com",
+                        "username": "user42",
+                        "first_name": "John",
+                        "last_name": "Doe",
+                        "avatar_url": "https://lh3.googleusercontent.com/.../photo.jpg",
+                        "date_joined": "2025-07-01T14:30:00Z"
+                    }
+                }
+            )]
         ),
         400: OpenApiResponse(
-            description='Invalid or malformed Google ID token',
+            description='Missing or invalid Google access token',
             examples=[
                 OpenApiExample(
-                    name='Malformed token',
-                    summary='Token is not a valid JWT',
-                    value={'detail': 'Invalid Google ID token: Unable to parse'},
+                    name='No token',
+                    summary='Access token не передано',
+                    value={'detail': 'Access token is required.'},
                     response_only=True
                 ),
                 OpenApiExample(
-                    name='Audience mismatch',
-                    summary='Token audience does not match',
-                    value={'detail': 'Token audience mismatch'},
+                    name='Invalid token',
+                    summary='Token is invalid or expired',
+                    value={'detail': 'Invalid or expired access token'},
                     response_only=True
                 ),
             ]
@@ -66,26 +60,42 @@ class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        error = request.data.get('error')
-        id_token_value = request.data.get('id_token')
-        if error or not id_token_value:
-            # будуємо origin (scheme + netloc) із FRONTEND_URL
-            parsed = urlparse(settings.FRONTEND_URL)
-            origin = f"{parsed.scheme}://{parsed.netloc}"
-            return redirect(f"{origin}/sign-up")
+        # 1) Отримуємо access_token з тіла запиту
+        access_token = request.data.get('access_token')
+        if not access_token:
+            return Response(
+                {"detail": "Access token is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # 1) Валідація id_token
-        serializer = GoogleAuthSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        # 2) Валідуємо його через Google API
+        try:
+            user_data = validate_access_token(access_token)
+        except ValueError as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # 2) Логіка створення/отримання користувача
-        result = serializer.save()
-        user = result['user']
-        token = result['token']
+        # 3) Створюємо або оновлюємо користувача в базі
+        user_info = user_data  # дані від Google (email, sub, given_name, family_name, picture)
+        user, _ = User.objects.update_or_create(
+            email=user_info['email'],
+            defaults={
+                'username': user_info['email'].split('@')[0],
+                'first_name': user_info.get('given_name', ''),
+                'last_name': user_info.get('family_name', ''),
+                'google_id': user_info['sub'],
+                'avatar_url': user_info.get('picture', ''),
+            }
+        )
 
-        # 3) Повертаємо токен і дані профілю
+        # 4) Отримуємо токен для нашої системи
+        token, _ = Token.objects.get_or_create(user=user)
+
+        # 5) Повертаємо JWT-токен і дані користувача
         return Response({
-            'token': token,
+            'token': token.key,
             'user': {
                 'id': user.id,
                 'email': user.email,

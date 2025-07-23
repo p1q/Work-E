@@ -7,10 +7,11 @@ from rest_framework.authtoken.models import Token
 
 
 class GoogleAuthSerializer(serializers.Serializer):
-    id_token = serializers.CharField(write_only=True)
+    access_token = serializers.CharField(write_only=True)
 
-    def validate_id_token(self, value):
+    def validate_access_token(self, value):
         try:
+            # Валидация access_token через Google API
             idinfo = id_token.verify_oauth2_token(
                 value,
                 requests.Request(),
@@ -18,10 +19,11 @@ class GoogleAuthSerializer(serializers.Serializer):
                 clock_skew_in_seconds=15
             )
         except ValueError as e:
-            raise serializers.ValidationError(f"Invalid Google ID token: {e}")
+            raise serializers.ValidationError(f"Invalid Google access token: {e}")
         except requests.exceptions.RequestException as e:
             raise serializers.ValidationError(f"Network error during Google token validation: {e}")
 
+        # Проверка на аудиторию
         aud = idinfo.get('aud')
         valid_aud = settings.GOOGLE_CLIENT_ID
         if isinstance(aud, list):
@@ -34,7 +36,7 @@ class GoogleAuthSerializer(serializers.Serializer):
         return idinfo
 
     def create(self, validated_data):
-        info = validated_data['id_token']
+        info = validated_data['access_token']
         email = info.get('email')
         google_id = info.get('sub')
         first_name = info.get('given_name', '')
