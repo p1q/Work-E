@@ -10,7 +10,7 @@ class VacancyListCreateView(generics.ListCreateAPIView):
     serializer_class = VacancySerializer
 
     @extend_schema(
-        tags=['Vacancy'],
+        tags=['Vacancies'],
         request=VacancySerializer,
         responses={201: VacancySerializer, 400: None}
     )
@@ -23,7 +23,7 @@ class VacancyRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     serializer_class = VacancySerializer
 
     @extend_schema(
-        tags=['Vacancy'],
+        tags=['Vacancies'],
         responses={200: VacancySerializer, 404: None}
     )
     def retrieve(self, request, *args, **kwargs):

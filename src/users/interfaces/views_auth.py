@@ -12,7 +12,7 @@ from shared.auth.service import AuthService
 
 
 @extend_schema(
-    tags=["Auth"],
+    tags=["Token"],
     summary="Отримання access/refresh токенів (логін)",
     request={
         "type": "object",
@@ -45,7 +45,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 @extend_schema(
-    tags=["Auth"],
+    tags=["Token"],
     summary="Оновлення access-токена по refresh-токену",
     request={
         "type": "object",
@@ -77,7 +77,7 @@ class CustomTokenRefreshView(TokenRefreshView):
 
 
 @extend_schema(
-    tags=["Auth"],
+    tags=["Users"],
     summary="Вихід користувача (видаляє токени та куки)",
     responses={
         200: {

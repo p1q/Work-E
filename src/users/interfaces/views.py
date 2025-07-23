@@ -125,6 +125,10 @@ class LoginView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    tags=['Users'],
+    responses={200: UserSerializer, 400: None}
+)
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
