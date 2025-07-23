@@ -1,5 +1,4 @@
 from django.db import IntegrityError
-from django.shortcuts import redirect
 from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import status, generics
 from rest_framework.authtoken.models import Token
@@ -7,8 +6,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from users.infrastructure.models import User
-from users.interfaces.serializers import (UserSerializer, RegisterSerializer, LoginSerializer,
-                                          PatchUserSerializer)
+from users.interfaces.serializers import (
+    UserSerializer,
+    RegisterSerializer,
+    LoginSerializer,
+    PatchUserSerializer,
+)
 
 
 @extend_schema(
@@ -53,6 +56,14 @@ class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     )
     def patch(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
+
+    @extend_schema(
+        methods=['PUT'],
+        request=PatchUserSerializer,
+        responses={200: UserSerializer}
+    )
+    def put(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
 
 
 @extend_schema(
