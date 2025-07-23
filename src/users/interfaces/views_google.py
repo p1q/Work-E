@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from .serializers_google import GoogleAuthSerializer
-from users.service import fetch_google_userinfo  # новий імпорт
+from users.service import fetch_google_userinfo
 from users.infrastructure.models import User
 from rest_framework.authtoken.models import Token
 
