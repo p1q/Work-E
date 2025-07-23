@@ -31,7 +31,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'drf_spectacular',
-    'drf_spectacular_sidecar',
 
     'rest_framework_simplejwt.token_blacklist',
 
@@ -99,12 +98,12 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-# drf-spectacular OpenAPI / Swagger settings
+# OpenAPI / Swagger
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Work-E API',
     'DESCRIPTION': 'Full OpenAPI schema for Work-E API',
     'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_INCLUDE_SCHEMA': True,
     'SCHEMA_PATH_PREFIX': r'/api/',
     'COMPONENT_SPLIT_REQUEST': True,
     'COMPONENT_SPLIT_PARAMETERS': True,
@@ -113,6 +112,24 @@ SPECTACULAR_SETTINGS = {
         'tagsSorter': 'alpha',
         'operationsSorter': 'method',
     },
+    'SECURITY_SCHEMES': {
+        'BearerAuth': {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+            'description': 'Authorization: Bearer <JWT access token>',
+        },
+        'TokenAuth': {
+            'type': 'apiKey',
+            'in': 'header',
+            'name': 'Authorization',
+            'description': 'Authorization: Token <DRF token>',
+        },
+    },
+    'DEFAULT_SECURITY': [
+        {'BearerAuth': []},
+        {'TokenAuth': []},
+    ],
 }
 
 SIMPLE_JWT = {
@@ -122,7 +139,7 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-# CORS-настройки
+# CORS
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "https://work-e.netlify.app",
@@ -137,7 +154,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     'access-control-allow-credentials',
 ]
 
-# Cookie & CSRF
+# Cookies & CSRF
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'None'
@@ -145,13 +162,13 @@ SESSION_COOKIE_SAMESITE = 'None'
 CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = 'None'
 
-# Локализация и часовой пояс
+# Localization & Timezone
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Статика и медиа
+# Static & Media
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
