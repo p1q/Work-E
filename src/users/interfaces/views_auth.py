@@ -78,7 +78,7 @@ class CustomTokenRefreshView(TokenRefreshView):
 
 @extend_schema(
     tags=["Users"],
-    summary="Вихід користувача (видаляє токени та куки)",
+    summary="Вихід користувача (видаляє токени)",
     responses={
         200: {
             "type": "object",
