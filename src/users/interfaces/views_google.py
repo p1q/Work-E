@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from .serializers_google import GoogleAuthSerializer
-from users.service import validate_access_token  # <- зміна імпорту
+from users.service import fetch_google_userinfo  # новий імпорт
 from users.infrastructure.models import User
 from rest_framework.authtoken.models import Token
 
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
                 OpenApiExample(
                     name='Invalid token',
                     summary='Token is invalid or expired',
-                    value={'detail': 'Invalid or expired access token'},
+                    value={'detail': 'Google userinfo error: 401 ...'},
                     response_only=True
                 ),
             ]
@@ -68,24 +68,24 @@ class GoogleLoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 2) Валідуємо його через Google API
+        # 2) Отримуємо дані користувача через Google UserInfo API
         try:
-            user_data = validate_access_token(access_token)
+            user_info = fetch_google_userinfo(access_token)
         except ValueError as e:
+            logger.warning("Google userinfo failed: %s", e)
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # 3) Створюємо або оновлюємо користувача в базі
-        user_info = user_data  # дані від Google (email, sub, given_name, family_name, picture)
         user, _ = User.objects.update_or_create(
             email=user_info['email'],
             defaults={
                 'username': user_info['email'].split('@')[0],
                 'first_name': user_info.get('given_name', ''),
                 'last_name': user_info.get('family_name', ''),
-                'google_id': user_info['sub'],
+                'google_id': user_info.get('sub', ''),
                 'avatar_url': user_info.get('picture', ''),
             }
         )
@@ -93,7 +93,7 @@ class GoogleLoginView(APIView):
         # 4) Отримуємо токен для нашої системи
         token, _ = Token.objects.get_or_create(user=user)
 
-        # 5) Повертаємо JWT-токен і дані користувача
+        # 5) Повертаємо токен і дані користувача
         return Response({
             'token': token.key,
             'user': {
