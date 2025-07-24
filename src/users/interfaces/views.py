@@ -1,5 +1,6 @@
 from django.db import IntegrityError
-from drf_spectacular.utils import extend_schema, OpenApiExample
+from django.shortcuts import redirect
+from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from rest_framework import status, generics
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -69,7 +70,19 @@ class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 @extend_schema(
     tags=['Users'],
     request=RegisterSerializer,
-    responses={201: {'application/json': {'token': 'abc123'}}, 400: None},
+    responses={
+        201: OpenApiResponse(
+            response={'type': 'object', 'properties': {'token': {'type': 'string'}}},
+            description='Успешная регистрация',
+            examples=[
+                OpenApiExample(
+                    'Пример успешной регистрации',
+                    value={'token': 'abc123def456'}
+                )
+            ]
+        ),
+        400: OpenApiResponse(description='Ошибка валидации')
+    },
     examples=[
         OpenApiExample('Реєстрація', summary='Створення нового користувача',
                        value={'email': 'a@b.c', 'username': 'user', 'password': 'pass'})
@@ -107,7 +120,19 @@ class RegisterView(APIView):
 @extend_schema(
     tags=['Users'],
     request=LoginSerializer,
-    responses={200: {'application/json': {'token': 'abc123'}}, 400: None},
+    responses={
+        200: OpenApiResponse(
+            response={'type': 'object', 'properties': {'token': {'type': 'string'}}},
+            description='Успешный вход',
+            examples=[
+                OpenApiExample(
+                    'Пример успешного входа',
+                    value={'token': 'abc123def456'}
+                )
+            ]
+        ),
+        400: OpenApiResponse(description='Ошибка валидации')
+    },
     examples=[
         OpenApiExample('Логін', summary='Аутентифікація за email і паролем',
                        value={'email': 'a@b.c', 'password': 'pass'})

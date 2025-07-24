@@ -17,6 +17,24 @@ logger = logging.getLogger(__name__)
     request=LinkedInAuthSerializer,
     responses={
         200: OpenApiResponse(
+            response={
+                'type': 'object',
+                'properties': {
+                    'token': {'type': 'string'},
+                    'user': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'integer'},
+                            'email': {'type': 'string', 'format': 'email'},
+                            'username': {'type': 'string'},
+                            'first_name': {'type': 'string'},
+                            'last_name': {'type': 'string'},
+                            'avatar_url': {'type': 'string', 'format': 'uri'},
+                            'date_joined': {'type': 'string', 'format': 'date-time'}
+                        }
+                    }
+                }
+            },
             description='Successful login via LinkedIn',
             examples=[OpenApiExample(
                 name='Successful login example',

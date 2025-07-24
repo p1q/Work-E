@@ -107,6 +107,7 @@ SPECTACULAR_SETTINGS = {
     'SCHEMA_PATH_PREFIX': r'/api/',
     'COMPONENT_SPLIT_REQUEST': True,
     'COMPONENT_SPLIT_PARAMETERS': True,
+    'DEFAULT_GENERATOR_CLASS': 'drf_spectacular.generators.SchemaGenerator',
     'SWAGGER_UI_SETTINGS': {
         'layout': 'BaseLayout',
         'tagsSorter': 'alpha',
@@ -184,6 +185,7 @@ MEDIA_ROOT = Path(os.getenv('CV_FILES_PATH', BASE_DIR / 'media'))
 MEDIA_URL = '/media/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 LINKEDIN_CLIENT_ID = os.getenv('LINKEDIN_CLIENT_ID')
