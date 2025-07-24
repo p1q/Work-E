@@ -111,6 +111,13 @@ SPECTACULAR_SETTINGS = {
         'layout': 'BaseLayout',
         'tagsSorter': 'alpha',
         'operationsSorter': 'method',
+        'requestCredentials': 'include',
+        'persistAuthorization': True,
+        'displayOperationId': True,
+        'tryItOutEnabled': True,
+        'defaultModelsExpandDepth': 1,
+        'defaultModelExpandDepth': 1,
+        'displayRequestDuration': True,
     },
     'SECURITY_SCHEMES': {
         'BearerAuth': {
