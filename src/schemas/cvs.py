@@ -1,4 +1,5 @@
-from drf_spectacular.utils import OpenApiExample, OpenApiResponse
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 CV_SCHEMA_EXAMPLE = {
     'id': 1,
@@ -8,95 +9,70 @@ CV_SCHEMA_EXAMPLE = {
 }
 
 CV_LIST_RESPONSE = OpenApiResponse(
-    response={'type': 'array', 'items': {'$ref': '#/components/schemas/CV'}},
     description='Список резюме',
-    examples=[
-        OpenApiExample(
-            'Приклад списку резюме',
-            value=[CV_SCHEMA_EXAMPLE]
-        )
-    ]
+    examples=[OpenApiExample('Пример списка', value=[CV_SCHEMA_EXAMPLE])]
 )
 
 CV_DETAIL_RESPONSE = OpenApiResponse(
-    response={'$ref': '#/components/schemas/CV'},
-    description='Деталі резюме',
-    examples=[
-        OpenApiExample(
-            'Приклад інформації про резюме',
-            value=CV_SCHEMA_EXAMPLE
-        )
-    ]
-)
-
-CV_CREATE_REQUEST = {
-    'type': 'object',
-    'properties': {
-        'email': {'type': 'string', 'format': 'email', 'example': 'user@example.com'},
-        'cv_file': {'type': 'string', 'format': 'binary'}
-    },
-    'required': ['email', 'cv_file']
-}
-
-CV_CREATE_RESPONSE = OpenApiResponse(
-    response={'$ref': '#/components/schemas/CV'},
-    description='Резюме завантажено',
-    examples=[
-        OpenApiExample(
-            'Приклад створеного резюме',
-            value=CV_SCHEMA_EXAMPLE
-        )
-    ]
+    description='Детали резюме',
+    examples=[OpenApiExample('Пример резюме', value=CV_SCHEMA_EXAMPLE)]
 )
 
 CV_DELETE_RESPONSE = OpenApiResponse(description='Резюме видалено')
 
-CV_BY_EMAIL_REQUEST = {
-    'type': 'object',
-    'properties': {
-        'email': {'type': 'string', 'format': 'email', 'example': 'user@example.com'}
+# Специфичные запросы/ответы
+CV_CREATE = {
+    'request': {
+        'content': {
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'email': {'type': 'string', 'example': 'user@example.com'},
+                    'cv_file': {'type': 'string', 'format': 'binary'}
+                }
+            }
+        }
     },
-    'required': ['email']
+    'responses': {
+        201: OpenApiResponse(
+            description='Резюме завантажено',
+            examples=[OpenApiExample('Пример создания', value=CV_SCHEMA_EXAMPLE)]
+        )
+    }
 }
 
-CV_BY_EMAIL_RESPONSE_SUCCESS = OpenApiResponse(
-    response={'type': 'array', 'items': {'$ref': '#/components/schemas/CV'}},
-    description='Список резюме для вказаної електронної пошти',
-    examples=[
-        OpenApiExample(
-            'Приклад списку резюме',
-            value=[CV_SCHEMA_EXAMPLE]
-        )
-    ]
-)
+CV_BY_EMAIL = {
+    'request': {
+        'content': {
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'email': {'type': 'string', 'example': 'user@example.com'}
+                }
+            }
+        }
+    },
+    'responses': {
+        200: OpenApiResponse(
+            description='Список резюме по email',
+            examples=[OpenApiExample('Пример списка', value=[CV_SCHEMA_EXAMPLE])]
+        ),
+        404: OpenApiResponse(description='Резюме не знайдено')
+    }
+}
 
-CV_BY_EMAIL_RESPONSE_NOT_FOUND = OpenApiResponse(
-    description='Резюме для вказаної електронної пошти не знайдено',
-    examples=[
-        OpenApiExample(
-            'Резюме не знайдено',
-            value={'detail': 'No CVs found for email "user@example.com".'}
-        )
-    ]
-)
+CV_LAST_BY_EMAIL = {
+    'request': CV_BY_EMAIL['request'],  # Переиспользуем ту же схему запроса
+    'responses': {
+        200: OpenApiResponse(
+            description='Останнє резюме по email',
+            examples=[OpenApiExample('Пример резюме', value=CV_SCHEMA_EXAMPLE)]
+        ),
+        404: OpenApiResponse(description='Резюме не знайдено')
+    }
+}
 
-CV_LAST_BY_EMAIL_RESPONSE_SUCCESS = OpenApiResponse(
-    response={'$ref': '#/components/schemas/CV'},
-    description='Останнє резюме для вказаної електронної пошти',
-    examples=[
-        OpenApiExample(
-            'Приклад останнього резюме',
-            value=CV_SCHEMA_EXAMPLE
-        )
-    ]
-)
-
-CV_LAST_BY_EMAIL_RESPONSE_NOT_FOUND = OpenApiResponse(
-    description='Резюме для вказаної електронної пошти не знайдено',
-    examples=[
-        OpenApiExample(
-            'Резюме не знайдено',
-            value={'detail': 'No CV found for email "user@example.com".'}
-        )
-    ]
-)
+# Параметры для GET запросов
+CV_LIST_PARAMETERS = [
+    OpenApiParameter(name='email', description='Фільтр по email', required=False, type=OpenApiTypes.EMAIL)
+]
