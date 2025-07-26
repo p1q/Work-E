@@ -1,79 +1,16 @@
 import logging
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
-
-from .serializers_google import GoogleAuthSerializer
-from users.service import fetch_google_userinfo
-from users.infrastructure.models import User
 from rest_framework.authtoken.models import Token
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from users.infrastructure.models import User
+from users.service import fetch_google_userinfo
 
 logger = logging.getLogger(__name__)
 
 
-@extend_schema(
-    tags=['Users'],
-    request=GoogleAuthSerializer,
-    responses={
-        200: OpenApiResponse(
-            response={
-                'type': 'object',
-                'properties': {
-                    'token': {'type': 'string'},
-                    'user': {
-                        'type': 'object',
-                        'properties': {
-                            'id': {'type': 'integer'},
-                            'email': {'type': 'string', 'format': 'email'},
-                            'username': {'type': 'string'},
-                            'first_name': {'type': 'string'},
-                            'last_name': {'type': 'string'},
-                            'avatar_url': {'type': 'string', 'format': 'uri'},
-                            'date_joined': {'type': 'string', 'format': 'date-time'}
-                        }
-                    }
-                }
-            },
-            description='Successful login via Google',
-            examples=[OpenApiExample(
-                name='Приклад успішної відповіді',
-                summary='Успішний вхід через Google',
-                value={
-                    "token": "abc123def456",
-                    "user": {
-                        "id": 42,
-                        "email": "user@example.com",
-                        "username": "user42",
-                        "first_name": "John",
-                        "last_name": "Doe",
-                        "avatar_url": "https://lh3.googleusercontent.com/.../photo.jpg",
-                        "date_joined": "2025-07-01T14:30:00Z"
-                    }
-                }
-            )]
-        ),
-        400: OpenApiResponse(
-            description='Missing or invalid Google access token',
-            examples=[
-                OpenApiExample(
-                    name='No token',
-                    summary='Access token не передано',
-                    value={'detail': 'Access token is required.'},
-                    response_only=True
-                ),
-                OpenApiExample(
-                    name='Invalid token',
-                    summary='Token is invalid or expired',
-                    value={'detail': 'Google userinfo error: 401 ...'},
-                    response_only=True
-                ),
-            ]
-        )
-    },
-)
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
 

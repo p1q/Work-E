@@ -101,7 +101,7 @@ REST_FRAMEWORK = {
 # OpenAPI / Swagger
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Work-E API',
-    'DESCRIPTION': 'Full OpenAPI schema for Work-E API',
+    'DESCRIPTION': 'Повна схема OpenAPI для Work-E API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': True,
     'SCHEMA_PATH_PREFIX': r'/api/',

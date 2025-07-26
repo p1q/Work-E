@@ -1,6 +1,4 @@
 from django.db import IntegrityError
-from django.shortcuts import redirect
-from drf_spectacular.utils import extend_schema, OpenApiExample, OpenApiResponse
 from rest_framework import status, generics
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -15,11 +13,6 @@ from users.interfaces.serializers import (
 )
 
 
-@extend_schema(
-    tags=['Users'],
-    request=UserSerializer,
-    responses={200: UserSerializer}
-)
 class UserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -27,67 +20,31 @@ class UserListCreateView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         username = request.data.get('username')
         email = request.data.get('email')
-
         errors = {}
         if username and User.objects.filter(username__iexact=username).exists():
-            errors['username'] = ['A user with that username already exists.']
+            errors['username'] = ['Користувач із таким ім\'ям вже існує.']
         if email and User.objects.filter(email__iexact=email).exists():
-            errors['email'] = ['A user with that email already exists.']
-
+            errors['email'] = ['Користувач із такою електронною поштою вже існує.']
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-
         return super().create(request, *args, **kwargs)
 
 
-@extend_schema(
-    tags=['Users'],
-    request=UserSerializer,
-    responses={200: UserSerializer}
-)
 class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
-        methods=['PATCH'],
-        request=PatchUserSerializer,
-        responses={200: UserSerializer}
-    )
     def patch(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
 
-    @extend_schema(
-        methods=['PUT'],
-        request=PatchUserSerializer,
-        responses={200: UserSerializer}
-    )
     def put(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
 
+    def delete(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
 
-@extend_schema(
-    tags=['Users'],
-    request=RegisterSerializer,
-    responses={
-        201: OpenApiResponse(
-            response={'type': 'object', 'properties': {'token': {'type': 'string'}}},
-            description='Успешная регистрация',
-            examples=[
-                OpenApiExample(
-                    'Пример успешной регистрации',
-                    value={'token': 'abc123def456'}
-                )
-            ]
-        ),
-        400: OpenApiResponse(description='Ошибка валидации')
-    },
-    examples=[
-        OpenApiExample('Реєстрація', summary='Створення нового користувача',
-                       value={'email': 'a@b.c', 'username': 'user', 'password': 'pass'})
-    ]
-)
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
@@ -102,42 +59,21 @@ class RegisterView(APIView):
                 err = str(e).lower()
                 if 'username' in err:
                     return Response(
-                        {'username': ['A user with that username already exists.']},
+                        {'username': ['Користувач із таким ім\'ям вже існує.']},
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 if 'email' in err:
                     return Response(
-                        {'email': ['A user with that email already exists.']},
+                        {'email': ['Користувач із такою електронною поштою вже існує.']},
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 return Response(
-                    {'detail': 'Could not create user due to database error.'},
+                    {'detail': 'Не вдалося створити користувача через помилку бази даних.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(
-    tags=['Users'],
-    request=LoginSerializer,
-    responses={
-        200: OpenApiResponse(
-            response={'type': 'object', 'properties': {'token': {'type': 'string'}}},
-            description='Успешный вход',
-            examples=[
-                OpenApiExample(
-                    'Пример успешного входа',
-                    value={'token': 'abc123def456'}
-                )
-            ]
-        ),
-        400: OpenApiResponse(description='Ошибка валидации')
-    },
-    examples=[
-        OpenApiExample('Логін', summary='Аутентифікація за email і паролем',
-                       value={'email': 'a@b.c', 'password': 'pass'})
-    ]
-)
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -150,18 +86,9 @@ class LoginView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@extend_schema(
-    tags=['Users'],
-    responses={200: UserSerializer, 400: None}
-)
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        code = request.GET.get('code')
-        request.GET.get('state')
-
-        if not code:
-            return Response({'error': 'Missing code'}, status=400)
-
-        return redirect(settings.FRONTEND_URL)
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
