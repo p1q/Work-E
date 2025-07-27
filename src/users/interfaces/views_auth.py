@@ -3,10 +3,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import (TokenObtainPairView, TokenRefreshView, )
 from shared.auth.service import AuthService
 from src.schemas.token import (TOKEN_OBTAIN_REQUEST, TOKEN_OBTAIN_RESPONSE, TOKEN_OBTAIN_RESPONSE_UNAUTHORIZED,
                                TOKEN_REFRESH_REQUEST, TOKEN_REFRESH_RESPONSE, TOKEN_REFRESH_RESPONSE_INVALID,
@@ -50,8 +47,9 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
+        request=None,
         responses={200: LOGOUT_RESPONSE},
-        description='Вихід користувача: чорнить refresh токен та видаляє куки.',
+        description='Вихід користувача - refresh токен у чорний список.',
         summary='Вихід користувача'
     )
     def post(self, request):
