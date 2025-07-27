@@ -10,17 +10,16 @@ CV_SCHEMA_EXAMPLE = {
 
 CV_LIST_RESPONSE = OpenApiResponse(
     description='Список резюме',
-    examples=[OpenApiExample('Пример списка', value=[CV_SCHEMA_EXAMPLE])]
+    examples=[OpenApiExample('Приклад списку', value=[CV_SCHEMA_EXAMPLE])]
 )
 
 CV_DETAIL_RESPONSE = OpenApiResponse(
-    description='Детали резюме',
-    examples=[OpenApiExample('Пример резюме', value=CV_SCHEMA_EXAMPLE)]
+    description='Деталі резюме',
+    examples=[OpenApiExample('Приклад резюме', value=CV_SCHEMA_EXAMPLE)]
 )
 
 CV_DELETE_RESPONSE = OpenApiResponse(description='Резюме видалено')
 
-# Специфичные запросы/ответы
 CV_CREATE = {
     'request': {
         'content': {
@@ -36,7 +35,7 @@ CV_CREATE = {
     'responses': {
         201: OpenApiResponse(
             description='Резюме завантажено',
-            examples=[OpenApiExample('Пример создания', value=CV_SCHEMA_EXAMPLE)]
+            examples=[OpenApiExample('Приклад створення', value=CV_SCHEMA_EXAMPLE)]
         )
     }
 }
@@ -55,24 +54,23 @@ CV_BY_EMAIL = {
     'responses': {
         200: OpenApiResponse(
             description='Список резюме по email',
-            examples=[OpenApiExample('Пример списка', value=[CV_SCHEMA_EXAMPLE])]
+            examples=[OpenApiExample('Приклад списку', value=[CV_SCHEMA_EXAMPLE])]
         ),
         404: OpenApiResponse(description='Резюме не знайдено')
     }
 }
 
 CV_LAST_BY_EMAIL = {
-    'request': CV_BY_EMAIL['request'],  # Переиспользуем ту же схему запроса
+    'request': CV_BY_EMAIL['request'],
     'responses': {
         200: OpenApiResponse(
             description='Останнє резюме по email',
-            examples=[OpenApiExample('Пример резюме', value=CV_SCHEMA_EXAMPLE)]
+            examples=[OpenApiExample('Приклад резюме', value=CV_SCHEMA_EXAMPLE)]
         ),
         404: OpenApiResponse(description='Резюме не знайдено')
     }
 }
 
-# Параметры для GET запросов
 CV_LIST_PARAMETERS = [
     OpenApiParameter(name='email', description='Фільтр по email', required=False, type=OpenApiTypes.EMAIL)
 ]
