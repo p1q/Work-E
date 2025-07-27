@@ -1,7 +1,7 @@
 from chatgpt.interfaces.serializers import (ChatGPTRequestSerializer, ChatGPTResponseSerializer,
                                             ChatGPTPlanRequestSerializer, ChatGPTPlanResponseSerializer, )
 from chatgpt.service import generate_chat_response, estimate_cost
-from drf_spectacular.utils import extend_schema, OpenApiRequest, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiRequest, OpenApiResponse, OpenApiExample
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -12,7 +12,7 @@ CHATGPT_VIEW_RESPONSE_ERROR = OpenApiResponse(
     response={'type': 'object', 'properties': {'error': {'type': 'string'}}},
     description='Помилка сервера',
     examples=[
-        OpenApiResponse.example(
+        OpenApiExample(
             name='Помилка при запиті до OpenAI',
             value={'error': 'Помилка при запиті до OpenAI: ...'}
         )

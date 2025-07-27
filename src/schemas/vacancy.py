@@ -40,34 +40,43 @@ VACANCY_DETAIL_RESPONSE = OpenApiResponse(
 )
 
 VACANCY_CREATE_REQUEST = {
-    'type': 'object',
-    'properties': {
-        'title': {'type': 'string', 'example': 'Python Developer'},
-        'link': {'type': 'string', 'format': 'uri', 'example': 'https://example.com/vacancy/1'},
-        'location': {'type': 'string', 'example': 'Київ, Україна'},
-        'salary': {'type': 'string', 'nullable': True, 'example': '50000-70000 грн'},
-        'category': {'type': 'string', 'example': 'IT'},
-        'date': {'type': 'string', 'format': 'date-time', 'example': '2023-01-01T10:00:00Z'},
-        'description': {'type': 'string', 'example': 'Шукаємо Python розробника...'},
-        'skills': {'type': 'string', 'nullable': True, 'example': 'Python, Django, REST API'},
-        'tools': {'type': 'string', 'nullable': True, 'example': 'Git, Docker'},
-        'responsibilities': {'type': 'string', 'nullable': True, 'example': 'Розробка веб-додатків...'},
-        'languages': {'type': 'string', 'nullable': True, 'example': 'Англійська (середній рівень)'},
-        'location_field': {'type': 'string', 'nullable': True, 'example': 'Київ'},
-        'salary_range': {'type': 'string', 'nullable': True, 'example': '50000-70000'}
+    'request': {
+        'content': {
+            'application/json': {
+                'schema': {
+                    'type': 'object',
+                    'properties': {
+                        'title': {'type': 'string', 'example': 'Python Developer'},
+                        'link': {'type': 'string', 'format': 'uri', 'example': 'https://example.com/vacancy/1'},
+                        'location': {'type': 'string', 'example': 'Київ, Україна'},
+                        'salary': {'type': 'string', 'nullable': True, 'example': '50000-70000 грн'},
+                        'category': {'type': 'string', 'example': 'IT'},
+                        'date': {'type': 'string', 'format': 'date-time', 'example': '2023-01-01T10:00:00Z'},
+                        'description': {'type': 'string', 'example': 'Шукаємо Python розробника...'},
+                        'skills': {'type': 'string', 'nullable': True, 'example': 'Python, Django, REST API'},
+                        'tools': {'type': 'string', 'nullable': True, 'example': 'Git, Docker'},
+                        'responsibilities': {'type': 'string', 'nullable': True, 'example': 'Розробка веб-додатків...'},
+                        'languages': {'type': 'string', 'nullable': True, 'example': 'Англійська (середній рівень)'},
+                        'location_field': {'type': 'string', 'nullable': True, 'example': 'Київ'},
+                        'salary_range': {'type': 'string', 'nullable': True, 'example': '50000-70000'}
+                    },
+                    'required': ['title', 'link', 'location', 'category', 'date', 'description']
+                }
+            }
+        }
     },
-    'required': ['title', 'link', 'location', 'category', 'date', 'description']
-}
-
-VACANCY_CREATE_RESPONSE = OpenApiResponse(
-    response={'$ref': '#/components/schemas/Vacancy'},
-    description='Вакансію створено',
-    examples=[
-        OpenApiExample(
-            'Приклад створеної вакансії',
-            value=VACANCY_SCHEMA_EXAMPLE
+    'responses': {
+        201: OpenApiResponse(
+            response={'$ref': '#/components/schemas/Vacancy'},
+            description='Вакансію створено',
+            examples=[
+                OpenApiExample(
+                    'Приклад створеної вакансії',
+                    value=VACANCY_SCHEMA_EXAMPLE
+                )
+            ]
         )
-    ]
-)
+    }
+}
 
 VACANCY_DELETE_RESPONSE = OpenApiResponse(description='Вакансію видалено')

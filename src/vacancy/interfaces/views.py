@@ -1,4 +1,4 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiRequest
 from rest_framework import generics
 
 from src.schemas.vacancy import (VACANCY_LIST_RESPONSE, VACANCY_CREATE_REQUEST, VACANCY_DETAIL_RESPONSE,
