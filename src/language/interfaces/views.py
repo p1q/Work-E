@@ -5,13 +5,12 @@ import re
 import langid
 import unicodedata
 from drf_spectacular.utils import extend_schema, OpenApiRequest
-from language.interfaces.serializers import LanguageDetectRequestSerializer, LanguageDetectResponseSerializer
 from rest_framework.parsers import JSONParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from src.language.interfaces.serializers import LanguageDetectSerializer
+from src.language.interfaces.serializers import LanguageDetectSerializer, LanguageDetectResponseSerializer
 from src.schemas.language import LANGUAGE_DETECT_RESPONSE, LANGUAGE_DETECT_REQUEST
 
 
@@ -29,6 +28,7 @@ class LenientJSONParser(JSONParser):
 
 class LanguageDetectView(APIView):
     permission_classes = [AllowAny]
+    parser_classes = [LenientJSONParser]
 
     @extend_schema(
         request=OpenApiRequest(LANGUAGE_DETECT_REQUEST),
