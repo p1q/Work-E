@@ -36,27 +36,32 @@ CHATGPT_PLAN_RESPONSE = OpenApiResponse(
         'type': 'object',
         'properties': {
             'model': {'type': 'string'},
-            'prompt_tokens': {'type': 'integer'},
-            'estimated_completion_tokens': {'type': 'integer'},
-            'cost_prompt': {'type': 'number', 'format': 'float'},
-            'cost_completion': {'type': 'number', 'format': 'float'},
-            'total_cost': {'type': 'number', 'format': 'float'},
-            'pricing': {'type': 'object'}
+            'input_tokens': {'type': 'integer'},
+            'output_tokens': {'type': 'integer'},
+            'total_cost': {'type': 'number', 'format': 'float'}
         }
     },
-    description='Оцінка вартості запиту',
+    description='Оцінка вартості',
     examples=[
         OpenApiExample(
-            'Приклад оцінки вартості',
+            'Приклад оцінки',
             value={
                 'model': 'gpt-3.5-turbo',
-                'prompt_tokens': 10,
-                'estimated_completion_tokens': 50,
-                'cost_prompt': 0.000015,
-                'cost_completion': 0.0001,
-                'total_cost': 0.000115,
-                'pricing': {'input': 0.0015, 'output': 0.002}
+                'input_tokens': 10,
+                'output_tokens': 20,
+                'total_cost': 0.000325
             }
+        )
+    ]
+)
+
+CHATGPT_VIEW_RESPONSE_ERROR = OpenApiResponse(
+    response={'type': 'object', 'properties': {'error': {'type': 'string'}}},
+    description='Помилка сервера',
+    examples=[
+        OpenApiExample(
+            name='Помилка при запиті до OpenAI',
+            value={'error': 'Помилка при запиті до OpenAI: ...'}
         )
     ]
 )
