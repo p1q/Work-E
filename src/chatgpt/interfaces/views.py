@@ -1,19 +1,34 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from chatgpt.interfaces.serializers import (ChatGPTRequestSerializer, ChatGPTResponseSerializer,
+                                            ChatGPTPlanRequestSerializer,
+                                            ChatGPTPlanResponseSerializer, )
+from chatgpt.service import generate_chat_response, estimate_cost
+from drf_spectacular.utils import extend_schema, OpenApiRequest
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from chatgpt.service import generate_chat_response, estimate_cost
-from chatgpt.interfaces.serializers import (
-    ChatGPTRequestSerializer,
-    ChatGPTResponseSerializer,
-    ChatGPTPlanRequestSerializer,
-    ChatGPTPlanResponseSerializer,
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from src.schemas.chatgpt import (
+    CHATGPT_VIEW_REQUEST,
+    CHATGPT_VIEW_RESPONSE_SUCCESS,
+    CHATGPT_VIEW_RESPONSE_ERROR,
+    CHATGPT_PLAN_VIEW_REQUEST,
+    CHATGPT_PLAN_VIEW_RESPONSE_SUCCESS,
 )
 
 
 class ChatGPTAPIView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=OpenApiRequest(CHATGPT_VIEW_REQUEST),  # Виправлено
+        responses={
+            200: CHATGPT_VIEW_RESPONSE_SUCCESS,
+            500: CHATGPT_VIEW_RESPONSE_ERROR,
+        },
+        description='Надсилає запит до моделі OpenAI та повертає відповідь.',
+        summary='Отримати відповідь від ChatGPT'
+    )
     def post(self, request):
         req_ser = ChatGPTRequestSerializer(data=request.data)
         req_ser.is_valid(raise_exception=True)
@@ -38,6 +53,14 @@ class ChatGPTAPIView(APIView):
 class ChatGPTPlanAPIView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=OpenApiRequest(CHATGPT_PLAN_VIEW_REQUEST),  # Виправлено
+        responses={
+            200: CHATGPT_PLAN_VIEW_RESPONSE_SUCCESS,
+        },
+        description='Оцінює вартість запиту до моделі OpenAI на основі кількості токенів.',
+        summary='Оцінити вартість запиту до ChatGPT'
+    )
     def post(self, request):
         req_ser = ChatGPTPlanRequestSerializer(data=request.data)
         req_ser.is_valid(raise_exception=True)

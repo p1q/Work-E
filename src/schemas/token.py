@@ -50,3 +50,14 @@ TOKEN_REFRESH_RESPONSE_INVALID = OpenApiExample(
     name="Invalid token",
     value={"detail": "Token is invalid or expired"},
 )
+
+LOGOUT_RESPONSE = OpenApiResponse(
+    response={'type': 'object', 'properties': {'detail': {'type': 'string'}}},
+    description='Вихід користувача (токени видалено)',
+    examples=[
+        OpenApiExample(
+            'Успішний вихід',
+            value={'detail': 'Вихід успішний'}
+        )
+    ]
+)

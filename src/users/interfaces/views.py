@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from drf_spectacular.utils import extend_schema
 from rest_framework import status, generics
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -12,11 +13,24 @@ from users.interfaces.serializers import (
     PatchUserSerializer,
 )
 
+from src.schemas.users import (USER_LIST_RESPONSE, USER_CREATE_REQUEST, USER_DETAIL_RESPONSE, USER_UPDATE_REQUEST,
+                               USER_UPDATE_RESPONSE, USER_DELETE_RESPONSE, REGISTER_REQUEST, REGISTER_RESPONSE_SUCCESS,
+                               REGISTER_RESPONSE_ERROR,
+                               LOGIN_REQUEST, LOGIN_RESPONSE_SUCCESS, LOGIN_RESPONSE_ERROR, CURRENT_USER_RESPONSE,
+                               )
+
 
 class UserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    @extend_schema(
+        responses={200: USER_LIST_RESPONSE},
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(**USER_CREATE_REQUEST)
     def create(self, request, *args, **kwargs):
         username = request.data.get('username')
         email = request.data.get('email')
@@ -35,19 +49,45 @@ class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
-    def patch(self, request, *args, **kwargs):
-        return super().partial_update(request, *args, **kwargs)
+    @extend_schema(
+        responses={200: USER_DETAIL_RESPONSE},
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
 
-    def put(self, request, *args, **kwargs):
+    @extend_schema(
+        request=USER_UPDATE_REQUEST,
+        responses={200: USER_UPDATE_RESPONSE},
+    )
+    def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
 
-    def delete(self, request, *args, **kwargs):
+    @extend_schema(
+        request=USER_UPDATE_REQUEST,
+        responses={200: USER_UPDATE_RESPONSE},
+    )
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
+
+    @extend_schema(
+        responses={204: USER_DELETE_RESPONSE},
+    )
+    def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
 
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=REGISTER_REQUEST,
+        responses={
+            201: REGISTER_RESPONSE_SUCCESS,
+            400: REGISTER_RESPONSE_ERROR,
+        },
+        description='Створює нового користувача та повертає токен.',
+        summary='Реєстрація нового користувача'
+    )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
@@ -77,6 +117,15 @@ class RegisterView(APIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=LOGIN_REQUEST,
+        responses={
+            200: LOGIN_RESPONSE_SUCCESS,
+            400: LOGIN_RESPONSE_ERROR,
+        },
+        description='Аутентифікує користувача та повертає токен.',
+        summary='Вхід користувача'
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
@@ -89,6 +138,11 @@ class LoginView(APIView):
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        responses={200: CURRENT_USER_RESPONSE},
+        description='Повертає інформацію про поточного аутентифікованого користувача.',
+        summary='Отримати інформацію про поточного користувача'
+    )
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)

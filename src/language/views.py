@@ -1,13 +1,12 @@
-import io
-import re
-import unicodedata
-import langid
 import math
-from rest_framework.views import APIView
+
+import langid
+import unicodedata
+from drf_spectacular.utils import extend_schema, OpenApiRequest
+from language.interfaces.serializers import LanguageDetectRequestSerializer, LanguageDetectResponseSerializer
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.parsers import JSONParser
-from .serializers import LanguageDetectSerializer
+from rest_framework.views import APIView
 
 
 class LenientJSONParser(JSONParser):
@@ -23,20 +22,25 @@ class LenientJSONParser(JSONParser):
 
 
 class LanguageDetectView(APIView):
-    parser_classes = [LenientJSONParser]
+    permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=OpenApiRequest(LANGUAGE_DETECT_REQUEST),
+        responses={
+            200: LANGUAGE_DETECT_RESPONSE,
+        },
+        description='Визначає мову тексту за допомогою бібліотеки langid.',
+        summary='Визначити мову тексту'
+    )
     def post(self, request):
-        serializer = LanguageDetectSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        serializer = LanguageDetectRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         raw_text = serializer.validated_data['text']
         cleaned_text = unicodedata.normalize('NFC', raw_text).strip()
-
         lang, log_prob = langid.classify(cleaned_text)
         confidence = round(math.exp(log_prob), 4)
-
-        return Response({
+        resp_ser = LanguageDetectResponseSerializer({
             'language': lang,
             'confidence': confidence
         })
+        return Response(resp_ser.data)
