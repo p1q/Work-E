@@ -17,6 +17,13 @@ class CV(models.Model):
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
+    skills = models.TextField(blank=True, null=True)
+    tools = models.TextField(blank=True, null=True)
+    responsibilities = models.TextField(blank=True, null=True)
+    languages = models.TextField(blank=True, null=True)
+    location_field = models.TextField(blank=True, null=True)
+    salary_range = models.CharField(max_length=255, blank=True, null=True)
+
     def __str__(self):
         return f"CV #{self.id} for User {self.user_id}: {os.path.basename(self.cv_file.name)}"
 

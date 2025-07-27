@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'cvs',
     'chatgpt',
     'vacancy',
+    'matching',
 ]
 
 MIDDLEWARE = [

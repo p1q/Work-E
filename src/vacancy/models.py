@@ -2,6 +2,9 @@ from django.db import models
 
 
 class Vacancy(models.Model):
+    class Meta:
+        app_label = 'vacancy'
+
     title = models.CharField(max_length=255)
     link = models.URLField()
     location = models.CharField(max_length=255)
