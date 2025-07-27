@@ -3,10 +3,7 @@ from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from src.views import api_root
 
-from users.interfaces.views_auth import (
-    CustomTokenObtainPairView,
-    CustomTokenRefreshView
-)
+from users.interfaces.views_auth import (CustomTokenObtainPairView, CustomTokenRefreshView)
 
 urlpatterns = [
     path('', api_root, name='api-root'),
@@ -14,10 +11,9 @@ urlpatterns = [
 
     path('api/users/', include('users.interfaces.urls')),
     path('api/cvs/', include('cvs.interfaces.urls')),
-    path('api/language/', include('language.urls')),
+    path('api/language/', include('language.interfaces.urls')),
     path('api/chatgpt/', include('chatgpt.interfaces.urls')),
     path('api/vacancies/', include('vacancy.interfaces.urls')),
-
 
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

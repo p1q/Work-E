@@ -1,5 +1,5 @@
 from django.db import IntegrityError
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiRequest
 from rest_framework import status, generics
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -16,8 +16,7 @@ from users.interfaces.serializers import (
 from src.schemas.users import (USER_LIST_RESPONSE, USER_CREATE_REQUEST, USER_DETAIL_RESPONSE, USER_UPDATE_REQUEST,
                                USER_UPDATE_RESPONSE, USER_DELETE_RESPONSE, REGISTER_REQUEST, REGISTER_RESPONSE_SUCCESS,
                                REGISTER_RESPONSE_ERROR,
-                               LOGIN_REQUEST, LOGIN_RESPONSE_SUCCESS, LOGIN_RESPONSE_ERROR, CURRENT_USER_RESPONSE,
-                               )
+                               LOGIN_REQUEST, LOGIN_RESPONSE_SUCCESS, LOGIN_RESPONSE_ERROR, CURRENT_USER_RESPONSE, )
 
 
 class UserListCreateView(generics.ListCreateAPIView):
@@ -30,7 +29,10 @@ class UserListCreateView(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    @extend_schema(**USER_CREATE_REQUEST)
+    @extend_schema(
+        request=OpenApiRequest(USER_CREATE_REQUEST),
+        responses={200: USER_LIST_RESPONSE},
+    )
     def create(self, request, *args, **kwargs):
         username = request.data.get('username')
         email = request.data.get('email')

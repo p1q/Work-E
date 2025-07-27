@@ -1,12 +1,18 @@
+import io
 import math
+import re
 
 import langid
 import unicodedata
 from drf_spectacular.utils import extend_schema, OpenApiRequest
 from language.interfaces.serializers import LanguageDetectRequestSerializer, LanguageDetectResponseSerializer
+from rest_framework.parsers import JSONParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from src.language.interfaces.serializers import LanguageDetectSerializer
+from src.schemas.language import LANGUAGE_DETECT_RESPONSE, LANGUAGE_DETECT_REQUEST
 
 
 class LenientJSONParser(JSONParser):
@@ -33,7 +39,7 @@ class LanguageDetectView(APIView):
         summary='Визначити мову тексту'
     )
     def post(self, request):
-        serializer = LanguageDetectRequestSerializer(data=request.data)
+        serializer = LanguageDetectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         raw_text = serializer.validated_data['text']
         cleaned_text = unicodedata.normalize('NFC', raw_text).strip()
