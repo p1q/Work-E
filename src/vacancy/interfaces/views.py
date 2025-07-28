@@ -1,15 +1,23 @@
-from drf_spectacular.utils import extend_schema, OpenApiRequest
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from vacancy.models import Vacancy
 
 from src.schemas.vacancy import (VACANCY_LIST_RESPONSE, VACANCY_CREATE_REQUEST, VACANCY_DETAIL_RESPONSE,
                                  VACANCY_DELETE_RESPONSE, )
 from .serializers import VacancySerializer
-from vacancy.models import Vacancy
 
 
 class VacancyListCreateView(generics.ListCreateAPIView):
     queryset = Vacancy.objects.all()
     serializer_class = VacancySerializer
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     @extend_schema(
         responses={200: VACANCY_LIST_RESPONSE},
@@ -25,6 +33,13 @@ class VacancyListCreateView(generics.ListCreateAPIView):
 class VacancyRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     queryset = Vacancy.objects.all()
     serializer_class = VacancySerializer
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     @extend_schema(
         responses={200: VACANCY_DETAIL_RESPONSE},
