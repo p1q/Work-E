@@ -20,5 +20,10 @@ class Vacancy(models.Model):
     location_field = models.TextField(blank=True, null=True)
     salary_range = models.CharField(max_length=255, blank=True, null=True)
 
+    english_level_required = models.CharField(max_length=50, blank=True, null=True,
+                                              help_text="Required English level (e.g., B1, B2, C1)")
+    is_remote = models.BooleanField(default=False, help_text="Is the position remote?")
+    is_hybrid = models.BooleanField(default=False, help_text="Is the position hybrid?")
+
     def __str__(self):
         return self.title

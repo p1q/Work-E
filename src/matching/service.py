@@ -13,6 +13,15 @@ WEIGHTS = {
     'salary': 0.10,
 }
 
+ENGLISH_LEVELS = {
+    'A1': 1,
+    'A2': 2,
+    'B1': 3,
+    'B2': 4,
+    'C1': 5,
+    'C2': 6,
+}
+
 
 def normalize_text(text):
     if not text:
@@ -65,12 +74,59 @@ def calculate_location_match(cv_location, vacancy_location):
         return 0.0
 
 
+def check_english_level_match(cv_level, vacancy_required_level):
+    """Перевіряє, чи рівень англійської користувача відповідає вимогам вакансії."""
+    if not cv_level or not vacancy_required_level:
+        return True  # Якщо інформація відсутня, не блокуємо
+
+    cv_level_num = ENGLISH_LEVELS.get(cv_level.upper())
+    required_level_num = ENGLISH_LEVELS.get(vacancy_required_level.upper())
+
+    if cv_level_num is None or required_level_num is None:
+        return True  # Якщо рівень не розпізнано, не блокуємо
+
+    # Різниця не більше 2 рівнів
+    return abs(cv_level_num - required_level_num) <= 2
+
+
+def check_relocation_match(cv_willing_to_relocate, vacancy_is_remote, vacancy_is_hybrid, cv_location, vacancy_location):
+    """Перевіряє, чи підходить вакансія користувачу з урахуванням локації та релокейту."""
+    if vacancy_is_remote or vacancy_is_hybrid:
+        return True  # Віддалена або гібридна вакансія підходить
+
+    if cv_location and vacancy_location and cv_location.lower() == vacancy_location.lower():
+        return True  # Однакова локація
+
+    if cv_willing_to_relocate:
+        return True  # Користувач готовий до релокейту
+
+    return False  # Не підходить
+
+
 def create_or_update_match(user: User, vacancy: Vacancy):
     from src.cvs.models import CV
     user_cv = CV.objects.filter(user=user).order_by('-uploaded_at').first()
     if not user_cv:
         return None
 
+    # Перевірка нових критеріїв
+    if not check_relocation_match(
+            user_cv.willing_to_relocate,
+            vacancy.is_remote,
+            vacancy.is_hybrid,
+            user_cv.location_field,
+            vacancy.location_field
+    ):
+        # Якщо не підходить за локацією/релокейтом, не створюємо матч
+        Match.objects.filter(user=user, vacancy=vacancy).delete()  # Видаляємо, якщо вже існує
+        return None
+
+    if not check_english_level_match(user_cv.english_level, vacancy.english_level_required):
+        # Якщо рівень англійської не підходить, не створюємо матч
+        Match.objects.filter(user=user, vacancy=vacancy).delete()  # Видаляємо, якщо вже існує
+        return None
+
+    # Якщо пройшли всі перевірки, розраховуємо матчинг
     skills_match = calculate_similarity(user_cv.skills, vacancy.skills)
     tools_match = calculate_similarity(user_cv.tools, vacancy.tools)
     responsibilities_match = calculate_similarity(user_cv.responsibilities, vacancy.responsibilities)
@@ -104,7 +160,6 @@ def create_or_update_match(user: User, vacancy: Vacancy):
 
 
 def bulk_create_matches():
-    from src.cvs.models import CV
     users_with_cv = User.objects.filter(cvs__isnull=False).distinct()
     vacancies = Vacancy.objects.all()
 

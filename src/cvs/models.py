@@ -24,6 +24,10 @@ class CV(models.Model):
     location_field = models.TextField(blank=True, null=True)
     salary_range = models.CharField(max_length=255, blank=True, null=True)
 
+    english_level = models.CharField(max_length=50, blank=True, null=True,
+                                     help_text="User's English level (e.g., A1, A2, B1, B2, C1, C2)")
+    willing_to_relocate = models.BooleanField(default=False, help_text="Is the user willing to relocate?")
+
     def __str__(self):
         return f"CV #{self.id} for User {self.user_id}: {os.path.basename(self.cv_file.name)}"
 
