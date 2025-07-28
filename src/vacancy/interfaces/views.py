@@ -4,7 +4,7 @@ from rest_framework import generics
 from src.schemas.vacancy import (VACANCY_LIST_RESPONSE, VACANCY_CREATE_REQUEST, VACANCY_DETAIL_RESPONSE,
                                  VACANCY_DELETE_RESPONSE, )
 from .serializers import VacancySerializer
-from ..models import Vacancy
+from vacancy.models import Vacancy
 
 
 class VacancyListCreateView(generics.ListCreateAPIView):
