@@ -5,7 +5,7 @@ from vacancy.models import Vacancy
 
 from src.schemas.vacancy import (VACANCY_LIST_RESPONSE, VACANCY_CREATE_REQUEST, VACANCY_DETAIL_RESPONSE,
                                  VACANCY_DELETE_RESPONSE, )
-from .serializers import VacancySerializer
+from src.vacancy.interfaces.serializers import VacancySerializer
 
 
 class VacancyListCreateView(generics.ListCreateAPIView):
