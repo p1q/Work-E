@@ -4,6 +4,8 @@ from .views import (
     CVRetrieveDestroyView,
     CVByEmailPostView,
     LastCVByEmailPostView,
+    GenerateCVView,
+    AdaptCoverLetterView
 )
 
 urlpatterns = [
@@ -11,4 +13,6 @@ urlpatterns = [
     path('<int:pk>/', CVRetrieveDestroyView.as_view(), name='cv-detail'),
     path('by-email/', CVByEmailPostView.as_view(), name='cv-by-email'),
     path('last-by-email/', LastCVByEmailPostView.as_view(), name='cv-last-by-email'),
+    path('generate-cv/', GenerateCVView.as_view()),
+    path('adapt-cover-letter/', AdaptCoverLetterView.as_view()),
 ]

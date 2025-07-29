@@ -17,3 +17,5 @@ openai>=0.27.0
 tiktoken>=0.3.0
 pikepdf>=5.0.0
 django-cors-headers
+google.generativeai
+django_ratelimit
