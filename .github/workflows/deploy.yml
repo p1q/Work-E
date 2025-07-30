@@ -80,6 +80,7 @@ jobs:
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             LINKEDIN_CLIENT_ID=${{ secrets.LINKEDIN_CLIENT_ID }}
             LINKEDIN_CLIENT_SECRET=${{ secrets.LINKEDIN_CLIENT_SECRET }}
+            GENAI_API_KEY=${{ secrets.GENAI_API_KEY }}
             EOF
 
             docker run -d \
