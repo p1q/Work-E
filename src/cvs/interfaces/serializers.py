@@ -1,13 +1,23 @@
 import os
 
 from pikepdf import Pdf, PdfError
-from cvs.models import CV
+from ..models import CV
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 User = get_user_model()
 
+class CVGenerationSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    lastname = serializers.CharField()
+    experience = serializers.ListField(child=serializers.DictField())
+    skills = serializers.ListField(child=serializers.DictField())
+    education = serializers.ListField(child=serializers.DictField())
+
+class CoverLetterSerializer(serializers.Serializer):
+    coverLetter = serializers.CharField()
+    job_description = serializers.CharField()
 
 class CVSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
