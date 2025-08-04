@@ -5,7 +5,8 @@ from .views import (
     CVByEmailPostView,
     LastCVByEmailPostView,
     GenerateCVView,
-    AdaptCoverLetterView
+    AdaptCoverLetterView,
+    ExtractTextFromCVView
 )
 
 urlpatterns = [
@@ -15,4 +16,5 @@ urlpatterns = [
     path('last-by-email/', LastCVByEmailPostView.as_view(), name='cv-last-by-email'),
     path('generate-cv/', GenerateCVView.as_view()),
     path('adapt-cover-letter/', AdaptCoverLetterView.as_view()),
+    path('extract-text/', ExtractTextFromCVView.as_view(), name='cv-extract-text'),
 ]

@@ -20,3 +20,4 @@ django-cors-headers
 django-filter
 google.generativeai
 django_ratelimit
+pdfplumber

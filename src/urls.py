@@ -12,7 +12,6 @@ urlpatterns = [
     path('api/users/', include('users.interfaces.urls')),
     path('api/cvs/', include('cvs.interfaces.urls')),
     path('api/language/', include('language.interfaces.urls')),
-    path('api/chatgpt/', include('chatgpt.interfaces.urls')),
     path('api/vacancies/', include('vacancy.interfaces.urls')),
     path('api/matching/', include('matching.interfaces.urls')),
 

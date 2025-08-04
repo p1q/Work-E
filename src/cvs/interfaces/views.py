@@ -1,29 +1,26 @@
-from django.utils.decorators import method_decorator
-from rest_framework import generics, status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from drf_spectacular.utils import extend_schema, OpenApiResponse
-
-from ..models import CV
-from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer
-from src.schemas.cvs import (
-    CV_LIST_RESPONSE,
-    CV_CREATE,
-    CV_DETAIL_RESPONSE,
-    CV_DELETE_RESPONSE,
-    CV_BY_EMAIL,
-    CV_LAST_BY_EMAIL,
-    CV_LIST_PARAMETERS
-)
+import io
 import logging
 import os
-from rest_framework import status
-from rest_framework.response import Response
+
 import google.generativeai as genai
-from dotenv import load_dotenv
+import pdfplumber
+from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
+from dotenv import load_dotenv
+from drf_spectacular.utils import extend_schema, OpenApiResponse
+from rest_framework import generics
+from rest_framework import status
+from rest_framework.parsers import JSONParser
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
+                             CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
+from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer
+from .serializers import ExtractTextFromCVRequestSerializer, ExtractTextFromCVResponseSerializer
+from ..models import CV
 
 logger = logging.getLogger(__name__)
 
@@ -190,3 +187,108 @@ class LastCVByEmailPostView(APIView):
             return Response({'detail': f'Резюме для "{email}" не знайдено.'}, status=status.HTTP_404_NOT_FOUND)
         serializer = CVSerializer(cv)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=["CVs"],
+    summary="Видобути текст із останнього CV користувача",
+    description="Отримує останнє завантажене CV користувача за його ID і видобуває текст за допомогою pdfplumber.",
+    request=ExtractTextFromCVRequestSerializer,
+    responses={
+        200: ExtractTextFromCVResponseSerializer,
+        400: OpenApiResponse(description='Помилка в запиті, даних користувача/CV або файлі PDF'),
+        404: OpenApiResponse(description='Користувач або CV не знайдено'),
+        500: OpenApiResponse(description='Помилка сервера при обробці PDF'),
+    }
+)
+class ExtractTextFromCVView(APIView):
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+
+    def post(self, request, *args, **kwargs):
+        logger = logging.getLogger(__name__)
+        serializer = ExtractTextFromCVRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            logger.warning(f"Недійсні дані для видобування тексту: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user_id = serializer.validated_data.get('user_id')
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            logger.warning(f"Користувач із id {user_id} не знайдений для видобування тексту")
+            return Response({'error': f'Користувача з ID {user_id} не знайдено.'}, status=status.HTTP_404_NOT_FOUND)
+
+        cv = CV.objects.filter(user=user).order_by('-uploaded_at').first()
+        if not cv:
+            logger.info(f"CV для користувача {user_id} не знайдено")
+            return Response({'error': f'Резюме для користувача з ID {user_id} не знайдено.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        if not cv.cv_file:
+            logger.warning(f"До CV {cv.id} для користувача {user_id} не прикріплений файл")
+            return Response({'error': f'До файлу резюме {cv.id} не прикріплений PDF.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            cv_file = cv.cv_file.open('rb')
+            pdf_content = cv_file.read()
+            cv_file.close()
+
+            pdf_stream = io.BytesIO(pdf_content)
+
+            extracted_text = ""
+            method_used = "pdf_text"
+
+            try:
+                with pdfplumber.open(pdf_stream) as pdf:
+                    text_parts = []
+                    for page in pdf.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            cleaned_page_text = '\n'.join(line for line in page_text.splitlines() if line.strip())
+                            text_parts.append(cleaned_page_text)
+                    extracted_text = "\n\n".join(text_parts).strip()
+                    logger.debug(f"Текст видобуто за допомогою pdfplumber з CV {cv.id}")
+            except pdfplumber.pdf.PSException as e:
+                logger.error(f"PSException під час використання pdfplumber для CV {cv.id}: {e}", exc_info=True)
+                return Response(
+                    {'error': f'Помилка обробки PDF файлу (можливо, пошкоджений або нестандартний формат): {str(e)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            except Exception as e:
+                logger.error(f"Неочікувана помилка під час використання pdfplumber для CV {cv.id}: {e}", exc_info=True)
+                extracted_text = ""
+
+            if extracted_text.strip():
+                response_data = {
+                    'text': extracted_text,
+                    'method': method_used,
+                    'cv_id': cv.id,
+                    'filename': cv.filename
+                }
+                response_serializer = ExtractTextFromCVResponseSerializer(response_data)
+                logger.info(f"Успішно видобуто текст (метод: {method_used}) з CV {cv.id} для користувача {user_id}")
+                return Response(response_serializer.data, status=status.HTTP_200_OK)
+            else:
+                logger.warning(f"Не вдалося видобути текст із CV {cv.id} для користувача {user_id}")
+                return Response(
+                    {
+                        'error': 'Не вдалося видобути текст із PDF файлу. '
+                                 'Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        except FileNotFoundError:
+            logger.error(f"Файл CV для CV {cv.id} не знайдено на диску.")
+            return Response({'error': 'Файл резюме не знайдено на сервері.'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            logger.error(f"Неочікувана помилка під час видобування тексту для CV {cv.id}, користувач {user_id}: {e}",
+                         exc_info=True)
+            return Response(
+                {'error': f'Сталася неочікувана помилка під час обробки файлу резюме: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

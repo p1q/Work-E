@@ -1,12 +1,14 @@
 import os
 
-from pikepdf import Pdf, PdfError
-from ..models import CV
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from pikepdf import Pdf, PdfError
 from rest_framework import serializers
 
+from ..models import CV
+
 User = get_user_model()
+
 
 class CVGenerationSerializer(serializers.Serializer):
     name = serializers.CharField()
@@ -15,9 +17,11 @@ class CVGenerationSerializer(serializers.Serializer):
     skills = serializers.ListField(child=serializers.DictField())
     education = serializers.ListField(child=serializers.DictField())
 
+
 class CoverLetterSerializer(serializers.Serializer):
     coverLetter = serializers.CharField()
     job_description = serializers.CharField()
+
 
 class CVSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
@@ -87,3 +91,14 @@ class CVSerializer(serializers.ModelSerializer):
                 'email': f'User with email \"{email}\" not found.'
             })
         return CV.objects.create(user=user, **validated_data)
+
+
+class ExtractTextFromCVRequestSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(help_text="ID користувача")
+
+
+class ExtractTextFromCVResponseSerializer(serializers.Serializer):
+    text = serializers.CharField(help_text="Витягнутий текст з PDF")
+    method = serializers.CharField(help_text="Метод витягнення: 'pdf_text'")
+    cv_id = serializers.IntegerField(help_text="ID використаного CV")
+    filename = serializers.CharField(help_text="Ім'я файлу CV")
