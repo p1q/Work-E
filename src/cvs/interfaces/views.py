@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 
 from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
-from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer
+from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer, User
 from .serializers import ExtractTextFromCVRequestSerializer, ExtractTextFromCVResponseSerializer
 from ..models import CV
 
@@ -205,7 +205,7 @@ class ExtractTextFromCVView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [JSONParser]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         logger = logging.getLogger(__name__)
         serializer = ExtractTextFromCVRequestSerializer(data=request.data)
         if not serializer.is_valid():
