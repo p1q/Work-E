@@ -282,9 +282,11 @@ class ExtractTextFromCVView(APIView):
                 )
 
         except FileNotFoundError:
-            logger.error(f"Файл CV для CV {cv.id} не знайдено на диску.")
-            return Response({'error': 'Файл резюме не знайдено на сервері.'},
+            file_path = cv.cv_file.path if cv.cv_file else "Шлях невідомий"
+            logger.error(f"Файл CV для CV {cv.id} не знайдено на диску за шляхом: {file_path}")
+            return Response({'error': f'Файл резюме не знайдено на сервері за шляхом: {file_path}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         except Exception as e:
             logger.error(f"Неочікувана помилка під час видобування тексту для CV {cv.id}, користувач {user_id}: {e}",
                          exc_info=True)
