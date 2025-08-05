@@ -110,9 +110,8 @@ class AnalyzeCVRequestSerializer(serializers.Serializer):
 
 class AnalyzeCVResponseSerializer(serializers.Serializer):
     skills = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
-    tools = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
     languages = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
-    location_field = serializers.CharField(required=False, allow_null=True)
+    location = serializers.CharField(required=False, allow_null=True)
     salary_range = serializers.CharField(required=False, allow_null=True)
     level = serializers.CharField(required=False, allow_null=True)
     english_level_required = serializers.CharField(required=False, allow_null=True)
