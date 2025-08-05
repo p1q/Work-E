@@ -1,9 +1,12 @@
 import io
+import json
 import logging
 import os
 
 import google.generativeai as genai
 import pdfplumber
+import requests
+from django.conf import settings
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from dotenv import load_dotenv
@@ -18,6 +21,7 @@ from rest_framework.views import APIView
 
 from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
+from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer
 from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer, User
 from .serializers import ExtractTextFromCVRequestSerializer, ExtractTextFromCVResponseSerializer
 from ..models import CV
@@ -294,3 +298,160 @@ class ExtractTextFromCVView(APIView):
                 {'error': f'Сталася неочікувана помилка під час обробки файлу резюме: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+@extend_schema(
+    tags=["CVs"],
+    summary="Проаналізувати резюме користувача за допомогою ШІ",
+    description="Отримує останнє резюме користувача, видобуває з нього текст, потім надсилає текст до ШІ для аналізу та видобування структурованих даних.",
+    request=AnalyzeCVRequestSerializer,
+    responses={
+        200: AnalyzeCVResponseSerializer,
+        400: OpenApiResponse(description='Помилка в запиті, даних користувача/CV або файлі PDF'),
+        404: OpenApiResponse(description='Користувач або CV не знайдено'),
+        500: OpenApiResponse(description='Помилка сервера при обробці PDF або взаємодії з ШІ'),
+        503: OpenApiResponse(description='Сервіс ШІ недоступний'),
+    }
+)
+class AnalyzeCVView(APIView):
+    permission_classes = [AllowAny]  # Або IsAuthenticated
+    parser_classes = [JSONParser]
+
+    def post(self, request, *args, **kwargs):
+        logger = logging.getLogger(__name__)
+        serializer = AnalyzeCVRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            logger.warning(f"Недійсні дані для аналізу резюме: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user_id = serializer.validated_data.get('user_id')
+
+        # --- 1. Видобути текст резюме ---
+        temp_request = type('TempRequest', (), {
+            'data': {'user_id': user_id},
+            'user': request.user
+        })()
+
+        extract_view = ExtractTextFromCVView()
+        extract_response = extract_view.post(temp_request)
+
+        if extract_response.status_code != status.HTTP_200_OK:
+            logger.warning(
+                f"Не вдалося видобути текст для аналізу CV користувача {user_id}. Статус: {extract_response.status_code}")
+            return Response(extract_response.data, status=extract_response.status_code)
+
+        # Отримуємо текст резюме
+        cv_text = extract_response.data.get('text')
+        cv_id = extract_response.data.get('cv_id')
+        filename = extract_response.data.get('filename')
+
+        if not cv_text:
+            logger.error(f"Видобуток тексту успішний, але текст порожній для CV {cv_id} користувача {user_id}")
+            return Response({'error': 'Видобутий текст резюме порожній.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.debug(f"Успішно видобуто текст з CV {cv_id} користувача {user_id} для подальшого аналізу.")
+
+        # --- 2. Підготувати запит до ШІ ---
+        prompt = f"""
+        Analyze the following candidate resume/CV and extract the specified parameters.
+        Provide the result as a JSON object with the exact keys listed below.
+        If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object.
+
+        Parameters to extract:
+        1. skills: Array of strings. Key technical skills and competencies mentioned (e.g., ["Python", "Django", "REST API"]).
+        2. tools: Array of strings. Specific tools, technologies, or platforms mentioned (e.g., ["Git", "Docker", "AWS"]).
+        3. languages: Array of objects. Languages mentioned, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. If no level, use null for level.
+        4. location_field: String. The candidate's location or preferred work arrangement mentioned (e.g., "Kyiv, Ukraine", "Remote", "Open to relocation").
+        5. salary_range: String. The candidate's expected salary range mentioned, in the format "min-max currency" (e.g., "50000-70000 UAH", "60000 EUR", "Negotiable"). If not specified, null.
+        6. level: String. The candidate's experience level implied (e.g., "Junior", "Middle", "Senior", "Lead"). If not specified, null.
+        7. english_level_required: String. The candidate's stated or implied English proficiency level (e.g., "A1", "A2", "B1", "B2", "C1", "C2"). If not specified, null.
+        8. is_remote: Boolean. Is the candidate open to remote work? (true/false). If not specified or unclear, null.
+        9. is_hybrid: Boolean. Is the candidate open to hybrid work? (true/false). If not specified or unclear, null.
+        10. willing_to_relocate: Boolean. Is the candidate willing to relocate? (true/false). If not specified or unclear, null.
+        11. responsibilities: Array of strings. Key responsibilities or achievements listed in previous roles (e.g., ["Developed web applications", "Led a team of 5 developers"]).
+
+        Candidate Resume/CV Text:
+        {cv_text}
+
+        JSON Output:
+        """
+
+        ai_url = getattr(settings, 'OPENAPI_AI_URL')
+
+        ai_request_data = {
+            "model": "qwen-max-latest",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ]
+        }
+
+        # --- 3. Надіслати запит до ШІ ---
+        try:
+            logger.info(f"Надсилання запиту до ШІ для аналізу CV {cv_id} користувача {user_id}...")
+            ai_response = requests.post(ai_url, json=ai_request_data, timeout=60)
+            ai_response.raise_for_status()
+
+            ai_response_data = ai_response.json()
+            logger.debug(f"Отримано відповідь від ШІ для CV {cv_id}")
+
+            # --- 4. Обробити відповідь ШІ ---
+            ai_content = ""
+            if 'choices' in ai_response_data and len(ai_response_data['choices']) > 0:
+                ai_content = ai_response_data['choices'][0]['message'].get('content', '')
+            elif 'message' in ai_response_data:
+                ai_content = ai_response_data['message'].get('content', '')
+            else:
+                ai_content = ai_response.text
+
+            if not ai_content:
+                logger.error(f"Відповідь ШІ для CV {cv_id} порожня.")
+                return Response({'error': 'Отримано порожню відповідь від ШІ.'},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            ai_content_clean = ai_content.strip()
+            if ai_content_clean.startswith("```json"):
+                ai_content_clean = ai_content_clean[7:]
+            if ai_content_clean.endswith("```"):
+                ai_content_clean = ai_content_clean[:-3]
+
+            ai_parsed_data = json.loads(ai_content_clean)
+
+            output_serializer = AnalyzeCVResponseSerializer(data=ai_parsed_data)
+            if not output_serializer.is_valid():
+                logger.warning(f"ШІ повернув недійсні дані для CV {cv_id}: {output_serializer.errors}")
+                return Response(
+                    {
+                        'error': 'ШІ повернув дані, які не відповідають очікуваному формату.',
+                        'details': output_serializer.errors,
+                        'raw_ai_response': ai_parsed_data
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            logger.info(f"Успішно проаналізовано CV {cv_id} користувача {user_id} за допомогою ШІ.")
+            return Response(output_serializer.validated_data, status=status.HTTP_200_OK)
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Помилка парсингу JSON від ШІ для CV {cv_id}: {e}. Відповідь: {ai_content}", exc_info=True)
+            return Response(
+                {
+                    'error': 'Помилка обробки відповіді від ШІ (недійсний JSON).',
+                    'raw_ai_response': ai_content
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except requests.exceptions.Timeout:
+            logger.error(f"Таймаут при з'єднанні з ШІ для CV {cv_id}.")
+            return Response({'error': 'Сервіс ШІ не відповідає (таймаут).'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Помилка з'єднання з ШІ для CV {cv_id}.")
+            return Response(
+                {'error': 'Неможливо з\'єднатися з сервісом ШІ.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Помилка HTTP-запиту до ШІ для CV {cv_id}: {e}", exc_info=True)
+            return Response({'error': f'Помилка взаємодії з сервісом ШІ: {str(e)}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            logger.error(f"Несподівана помилка під час аналізу CV {cv_id} користувача {user_id} ШІ: {e}", exc_info=True)
+            return Response({'error': f'Сталася несподівана помилка: {str(e)}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -81,6 +81,7 @@ jobs:
             LINKEDIN_CLIENT_ID=${{ secrets.LINKEDIN_CLIENT_ID }}
             LINKEDIN_CLIENT_SECRET=${{ secrets.LINKEDIN_CLIENT_SECRET }}
             GENAI_API_KEY=${{ secrets.GENAI_API_KEY }}
+            AI_SERVICE_URL =${{ secrets.AI_SERVICE_URL }}
             EOF
 
             docker run -d \

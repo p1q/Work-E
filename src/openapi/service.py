@@ -5,7 +5,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-OPENAPI_AI_URL = getattr(settings, 'OPENAPI_AI_URL', 'http://192.168.1.214:3264/api/chat/')
 OPENAPI_AI_MODEL = getattr(settings, 'OPENAPI_AI_MODEL', 'qwen-max-latest')
 OPENAPI_AI_TIMEOUT = getattr(settings, 'OPENAPI_AI_TIMEOUT', 30)
 

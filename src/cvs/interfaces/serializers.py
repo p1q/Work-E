@@ -102,3 +102,21 @@ class ExtractTextFromCVResponseSerializer(serializers.Serializer):
     method = serializers.CharField(help_text="Метод витягнення: 'pdf_text'")
     cv_id = serializers.IntegerField(help_text="ID використаного CV")
     filename = serializers.CharField(help_text="Ім'я файлу CV")
+
+
+class AnalyzeCVRequestSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(help_text="ID користувача")
+
+
+class AnalyzeCVResponseSerializer(serializers.Serializer):
+    skills = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    tools = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    languages = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
+    location_field = serializers.CharField(required=False, allow_null=True)
+    salary_range = serializers.CharField(required=False, allow_null=True)
+    level = serializers.CharField(required=False, allow_null=True)
+    english_level_required = serializers.CharField(required=False, allow_null=True)
+    is_remote = serializers.BooleanField(required=False, allow_null=True)
+    is_hybrid = serializers.BooleanField(required=False, allow_null=True)
+    willing_to_relocate = serializers.BooleanField(required=False, allow_null=True)
+    responsibilities = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
