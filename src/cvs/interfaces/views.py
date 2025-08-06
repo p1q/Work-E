@@ -1,9 +1,7 @@
-import io
 import logging
 import os
 
 import google.generativeai as genai
-import pdfplumber
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from dotenv import load_dotenv
@@ -36,6 +34,29 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 
 
+def _get_latest_cv_for_user(user_id, logger):
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        logger.warning(f"Користувач із id {user_id} не знайдений.")
+        return None, Response({'error': f'Користувача з ID {user_id} не знайдено.'}, status=status.HTTP_404_NOT_FOUND)
+
+    cv = CV.objects.filter(user=user).order_by('-uploaded_at').first()
+    if not cv:
+        logger.info(f"CV для користувача {user_id} не знайдено")
+        return None, Response({'error': f'Резюме для користувача з ID {user_id} не знайдено.'},
+                              status=status.HTTP_404_NOT_FOUND)
+
+    return cv, None
+
+
+def handle_serializer_validation(serializer, logger, view_name):
+    if not serializer.is_valid():
+        logger.warning(f"Недійсні дані запиту для {view_name}: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return None
+
+
 @method_decorator(
     ratelimit(key='ip', rate='1/m', method='POST', block=True),
     name='post'
@@ -43,11 +64,9 @@ genai.configure(api_key=API_KEY)
 @extend_schema(
     tags=["AI"],
     request=CVGenerationSerializer,
-    responses={
-        200: OpenApiResponse(description="Generated CV", response=CVGenerationSerializer),
-        400: OpenApiResponse(description="Validation Error"),
-        500: OpenApiResponse(description="Server Error"),
-    },
+    responses={200: OpenApiResponse(description="Generated CV", response=CVGenerationSerializer),
+               400: OpenApiResponse(description="Validation Error"),
+               500: OpenApiResponse(description="Server Error")},
 )
 class GenerateCVView(APIView):
     permission_classes = [AllowAny]
@@ -55,9 +74,9 @@ class GenerateCVView(APIView):
 
     def post(self, request) -> Response:
         serializer = CVGenerationSerializer(data=request.data)
-        if not serializer.is_valid():
-            logger.warning(f"Invalid CV input data: {serializer.errors}")
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        validation_response = handle_serializer_validation(serializer, logger, "GenerateCVView")
+        if validation_response:
+            return validation_response
 
         profile_data = serializer.validated_data
 
@@ -88,11 +107,9 @@ class GenerateCVView(APIView):
 @extend_schema(
     tags=["AI"],
     request=CoverLetterSerializer,
-    responses={
-        200: OpenApiResponse(description="Adapted Cover Letter", response=CoverLetterSerializer),
-        400: OpenApiResponse(description="Validation Error"),
-        500: OpenApiResponse(description="Server Error"),
-    },
+    responses={200: OpenApiResponse(description="Adapted Cover Letter", response=CoverLetterSerializer),
+               400: OpenApiResponse(description="Validation Error"),
+               500: OpenApiResponse(description="Server Error")},
 )
 class AdaptCoverLetterView(APIView):
     permission_classes = [AllowAny]
@@ -100,9 +117,9 @@ class AdaptCoverLetterView(APIView):
 
     def post(self, request) -> Response:
         serializer = CoverLetterSerializer(data=request.data)
-        if not serializer.is_valid():
-            logger.warning(f"Invalid Cover Letter input data: {serializer.errors}")
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        validation_response = handle_serializer_validation(serializer, logger, "AdaptCoverLetterView")
+        if validation_response:
+            return validation_response
 
         base_letter = serializer.validated_data.get('coverLetter')
         job_description = serializer.validated_data.get('job_description')
@@ -148,10 +165,7 @@ class CVListCreateView(generics.ListCreateAPIView):
 
 
 @extend_schema(
-    responses={
-        200: CV_DETAIL_RESPONSE,
-        204: CV_DELETE_RESPONSE
-    }
+    responses={200: CV_DETAIL_RESPONSE, 204: CV_DELETE_RESPONSE}
 )
 class CVRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     queryset = CV.objects.all()
@@ -192,34 +206,16 @@ class LastCVByEmailPostView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-def _get_latest_cv_for_user(user_id, logger):
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        logger.warning(f"Користувач із id {user_id} не знайдений.")
-        return None, Response({'error': f'Користувача з ID {user_id} не знайдено.'}, status=status.HTTP_404_NOT_FOUND)
-
-    cv = CV.objects.filter(user=user).order_by('-uploaded_at').first()
-    if not cv:
-        logger.info(f"CV для користувача {user_id} не знайдено")
-        return None, Response({'error': f'Резюме для користувача з ID {user_id} не знайдено.'},
-                              status=status.HTTP_404_NOT_FOUND)
-
-    return cv, None
-
-
 @extend_schema(
     tags=["CVs"],
     summary="Видобути текст із останнього резюме користувача",
     description="Отримує останнє завантажене резюме користувача за його ID "
                 "та видобуває з нього текстовий вміст.",
     request=ExtractTextFromCVRequestSerializer,
-    responses={
-        200: ExtractTextFromCVResponseSerializer,
-        400: OpenApiResponse(description='Помилка в запиті або обробці PDF'),
-        404: OpenApiResponse(description='Користувач або CV не знайдено'),
-        500: OpenApiResponse(description='Внутрішня помилка сервера'),
-    },
+    responses={200: ExtractTextFromCVResponseSerializer,
+               400: OpenApiResponse(description='Помилка в запиті або обробці PDF'),
+               404: OpenApiResponse(description='Користувач або CV не знайдено'),
+               500: OpenApiResponse(description='Внутрішня помилка сервера')},
 )
 class ExtractTextFromCVView(APIView):
     permission_classes = [AllowAny]
@@ -228,9 +224,9 @@ class ExtractTextFromCVView(APIView):
     def post(self, request, *args, **kwargs):
         logger = logging.getLogger(__name__)
         serializer = ExtractTextFromCVRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            logger.warning(f"Недійсні дані запиту для ExtractTextFromCVView: {serializer.errors}")
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        validation_response = handle_serializer_validation(serializer, logger, "ExtractTextFromCVView")
+        if validation_response:
+            return validation_response
 
         user_id = serializer.validated_data.get('user_id')
 
@@ -271,13 +267,11 @@ class ExtractTextFromCVView(APIView):
                 "видобуває текст, потім надсилає текст до ШІ для аналізу та "
                 "видобування структурованих даних.",
     request=AnalyzeCVRequestSerializer,
-    responses={
-        200: AnalyzeCVResponseSerializer,
-        400: OpenApiResponse(description='Помилка в запиті або даних користувача/CV'),
-        404: OpenApiResponse(description='Користувач або CV не знайдено'),
-        500: OpenApiResponse(description='Помилка сервера під час обробки PDF або взаємодії з ШІ'),
-        503: OpenApiResponse(description='Сервіс ШІ недоступний'),
-    },
+    responses={200: AnalyzeCVResponseSerializer,
+               400: OpenApiResponse(description='Помилка в запиті або даних користувача/CV'),
+               404: OpenApiResponse(description='Користувач або CV не знайдено'),
+               500: OpenApiResponse(description='Помилка сервера під час обробки PDF або взаємодії з ШІ'),
+               503: OpenApiResponse(description='Сервіс ШІ недоступний')},
 )
 class AnalyzeCVView(APIView):
     permission_classes = [AllowAny]
@@ -286,9 +280,9 @@ class AnalyzeCVView(APIView):
     def post(self, request, *args, **kwargs):
         logger = logging.getLogger(__name__)
         serializer = AnalyzeCVRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            logger.warning(f"Недійсні дані запиту для AnalyzeCVView: {serializer.errors}")
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        validation_response = handle_serializer_validation(serializer, logger, "AnalyzeCVView")
+        if validation_response:
+            return validation_response
 
         user_id = serializer.validated_data.get('user_id')
 
@@ -297,7 +291,6 @@ class AnalyzeCVView(APIView):
             return error_response
 
         try:
-            # Використовуємо логіку з extract_text_from_cv
             cv_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
 
             if not cv_text:
