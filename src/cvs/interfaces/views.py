@@ -277,7 +277,7 @@ class AnalyzeCVView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [JSONParser]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         logger = logging.getLogger(__name__)
         serializer = AnalyzeCVRequestSerializer(data=request.data)
         validation_response = handle_serializer_validation(serializer, logger, "AnalyzeCVView")
