@@ -114,7 +114,7 @@ class AnalyzeCVResponseSerializer(serializers.Serializer):
     location = serializers.CharField(required=False, allow_null=True)
     salary_range = serializers.CharField(required=False, allow_null=True)
     level = serializers.CharField(required=False, allow_null=True)
-    english_level_required = serializers.CharField(required=False, allow_null=True)
+    english_level = serializers.CharField(required=False, allow_null=True)
     is_remote = serializers.BooleanField(required=False, allow_null=True)
     is_hybrid = serializers.BooleanField(required=False, allow_null=True)
     willing_to_relocate = serializers.BooleanField(required=False, allow_null=True)

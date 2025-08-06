@@ -92,15 +92,15 @@ def check_english_level_match(cv_level, vacancy_required_level):
 def check_relocation_match(cv_willing_to_relocate, vacancy_is_remote, vacancy_is_hybrid, cv_location, vacancy_location):
     """Перевіряє, чи підходить вакансія користувачу з урахуванням локації та релокейту."""
     if vacancy_is_remote or vacancy_is_hybrid:
-        return True  # Віддалена або гібридна вакансія підходить
+        return True
 
     if cv_location and vacancy_location and cv_location.lower() == vacancy_location.lower():
-        return True  # Однакова локація
+        return True
 
     if cv_willing_to_relocate:
-        return True  # Користувач готовий до релокейту
+        return True
 
-    return False  # Не підходить
+    return False
 
 
 def create_or_update_match(user: User, vacancy: Vacancy):
@@ -118,12 +118,12 @@ def create_or_update_match(user: User, vacancy: Vacancy):
             vacancy.location_field
     ):
         # Якщо не підходить за локацією/релокейтом, не створюємо матч
-        Match.objects.filter(user=user, vacancy=vacancy).delete()  # Видаляємо, якщо вже існує
+        Match.objects.filter(user=user, vacancy=vacancy).delete()
         return None
 
-    if not check_english_level_match(user_cv.english_level, vacancy.english_level_required):
+    if not check_english_level_match(user_cv.english_level, vacancy.english_level):
         # Якщо рівень англійської не підходить, не створюємо матч
-        Match.objects.filter(user=user, vacancy=vacancy).delete()  # Видаляємо, якщо вже існує
+        Match.objects.filter(user=user, vacancy=vacancy).delete()
         return None
 
     # Якщо пройшли всі перевірки, розраховуємо матчинг
