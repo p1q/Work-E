@@ -3,6 +3,8 @@ from django.conf import settings
 import json
 import logging
 
+from src.settings import OPENAPI_AI_URL
+
 logger = logging.getLogger(__name__)
 
 OPENAPI_AI_MODEL = getattr(settings, 'OPENAPI_AI_MODEL', 'qwen-max-latest')
@@ -52,17 +54,16 @@ def extract_vacancy_data(description_text: str) -> dict:
     If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object.
 
     Parameters to extract:
-    1. skills: Array of strings. Key technical skills and competencies required (e.g., ["Python", "Django", "REST API"]).
-    2. tools: Array of strings. Specific tools, technologies, or platforms mentioned (e.g., ["Git", "Docker", "AWS"]).
-    3. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. If no level, use null for level.
-    4. location_field: String. The primary location or work arrangement mentioned (e.g., "Kyiv, Ukraine", "Remote", "Hybrid: Kyiv or Remote").
-    5. salary_range: String. The salary range mentioned, in the format "min-max currency" (e.g., "50000-70000 UAH", "60000 EUR", "Negotiable"). If not specified, null.
-    6. level: String. The experience level required (e.g., "Junior", "Middle", "Senior", "Lead"). If not specified, null.
-    7. english_level_required: String. The required English proficiency level (e.g., "A1", "A2", "B1", "B2", "C1", "C2"). If not specified, null.
-    8. is_remote: Boolean. Is the position fully remote? (true/false). If not specified or unclear, null.
-    9. is_hybrid: Boolean. Is the position hybrid (mix of remote/office)? (true/false). If not specified or unclear, null.
-    10. willing_to_relocate: Boolean. Is the candidate expected to relocate? (true/false). If not specified or unclear, null.
-    11. responsibilities: Array of strings. Key responsibilities listed (e.g., ["Develop web applications", "Write unit tests"]).
+    1. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
+    2. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. If no level, use null for level.
+    3. city: String. The candidate's city mentioned (e.g., "Kyiv", "Lviv", "Odesa").
+    4. salary_range: String. The salary range mentioned, in the format "min-max currency" (e.g., "50000-70000 UAH", "60000 EUR", "Negotiable"). If not specified, null.
+    5. level: String. The experience level required (e.g., "Junior", "Middle", "Senior", "Lead"). If not specified, null.
+    6. english_level_required: String. The required English proficiency level (e.g., "A1", "A2", "B1", "B2", "C1", "C2"). If not specified, null.
+    7. is_remote: Boolean. Is the position fully remote? (true/false). If not specified or unclear, null.
+    8. is_hybrid: Boolean. Is the position hybrid (mix of remote/office)? (true/false). If not specified or unclear, null.
+    9. willing_to_relocate: Boolean. Is the candidate expected to relocate? (true/false). If not specified or unclear, null.
+    10. responsibilities: Array of strings. Key responsibilities listed (e.g., ["Develop web applications", "Write unit tests"]).
 
     Job Description:
     {description_text}
