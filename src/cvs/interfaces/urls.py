@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (CVListCreateView, CVRetrieveDestroyView, CVByEmailPostView, LastCVByEmailPostView,
-                    GenerateCVView, AdaptCoverLetterView, ExtractTextFromCVView, AnalyzeCVView)
+                    GenerateCVView, AdaptCoverLetterView, AnalyzeCVView, ExtractTextFromCVView)
 
 urlpatterns = [
     path('', CVListCreateView.as_view(), name='cv-list-create'),

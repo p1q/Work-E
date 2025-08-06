@@ -75,7 +75,6 @@ class CVSerializer(serializers.ModelSerializer):
             # QPDF exposes embedded files under pdf.attachments
             attachments = list(pdf.attachments.keys())
         except Exception:
-            # if attribute missing, assume no attachments
             attachments = []
 
         if attachments:

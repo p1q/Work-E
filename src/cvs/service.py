@@ -1,5 +1,7 @@
 import logging
 import requests
+import pdfplumber
+import io
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from .models import CV
@@ -10,9 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 def extract_text_from_cv(cv):
-    import pdfplumber
-    import io
-
     if not cv.cv_file:
         logger.warning(f"До CV {cv.id} не прикріплений файл")
         raise ValidationError("До файлу резюме не прикріплений PDF.")
@@ -23,16 +22,25 @@ def extract_text_from_cv(cv):
         cv_file.close()
         pdf_stream = io.BytesIO(pdf_content)
         extracted_text = ""
+        method_used = "pdf_text"
 
-        with pdfplumber.open(pdf_stream) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    extracted_text += page_text + "\n"
+        try:
+            with pdfplumber.open(pdf_stream) as pdf:
+                text_parts = []
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        cleaned_page_text = ''.join(line for line in page_text.splitlines() if line.strip())
+                        text_parts.append(cleaned_page_text)
+                extracted_text = "".join(text_parts).strip()
+        except Exception as e:
+            logger.error(f"Помилка pdfplumber для CV {cv.id}: {e}", exc_info=True)
+            raise ValidationError(
+                'Не вдалося видобути текст із PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.')
 
-        if extracted_text.strip():
-            logger.debug(f"Успішно видобуто текст з CV {cv.id} для подальшого аналізу.")
-            return extracted_text.strip()
+        if extracted_text:
+            logger.debug(f"Успішно видобуто текст з CV {cv.id} методом {method_used}.")
+            return extracted_text, method_used, cv.id, cv.cv_file.name
         else:
             logger.warning(f"Не вдалося видобути текст із CV {cv.id}")
             raise ValidationError(
@@ -55,7 +63,7 @@ def analyze_cv_with_ai(cv_id, user_id):
             logger.error(f"CV з ID {cv_id} для користувача {user_id} не знайдено.")
             raise ValidationError("CV не знайдено.")
 
-        cv_text = extract_text_from_cv(cv)
+        cv_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
         if not cv_text:
             logger.error(f"Не вдалося видобути текст з CV {cv_id} користувача {user_id}.")
             raise ValidationError("Не вдалося видобути текст з резюме.")

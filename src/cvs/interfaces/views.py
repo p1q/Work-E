@@ -1,9 +1,7 @@
-import io
 import logging
 import os
 
 import google.generativeai as genai
-import pdfplumber
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from dotenv import load_dotenv
@@ -20,7 +18,7 @@ from rest_framework.views import APIView
 from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
 from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer
-from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer, User
+from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer
 from .serializers import ExtractTextFromCVRequestSerializer, ExtractTextFromCVResponseSerializer
 from ..models import CV
 from ..service import analyze_cv_with_ai
@@ -301,46 +299,48 @@ class ExtractTextFromCVView(APIView):
 
 @extend_schema(
     tags=["CVs"],
-    summary="Проанализировать резюме пользователя с помощью ИИ",
-    description="Получает последнее резюме пользователя, извлекает из него текст, затем отправляет текст в ИИ для анализа и извлечения структурированных данных.",
+    summary="Проаналізувати резюме користувача за допомогою ШІ",
+    description="Отримує резюме користувача за його ID, видобуває текст, потім надсилає текст до ШІ для аналізу та видобування структурованих даних.",
     request=AnalyzeCVRequestSerializer,
     responses={
         200: AnalyzeCVResponseSerializer,
-        400: OpenApiResponse(description='Ошибка в запросе или данных пользователя/CV'),
-        404: OpenApiResponse(description='Пользователь или CV не найден'),
-        500: OpenApiResponse(description='Ошибка сервера при обработке PDF или взаимодействии с ИИ'),
-        503: OpenApiResponse(description='Сервис ИИ недоступен'),
+        400: OpenApiResponse(description='Помилка в запиті або даних користувача/CV'),
+        404: OpenApiResponse(description='Користувач або CV не знайдено'),
+        500: OpenApiResponse(description='Помилка сервера під час обробки PDF або взаємодії з ШІ'),
+        503: OpenApiResponse(description='Сервіс ШІ недоступний'),
     },
 )
 class AnalyzeCVView(APIView):
-    permission_classes = [AllowAny]  # Or [IsAuthenticated]
+    permission_classes = [AllowAny]
     parser_classes = [JSONParser]
 
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         logger = logging.getLogger(__name__)
         serializer = AnalyzeCVRequestSerializer(data=request.data)
 
         if not serializer.is_valid():
-            logger.warning(f"Неверные данные запроса для AnalyzeCVView: {serializer.errors}")
+            logger.warning(f"Недійсні дані запиту для AnalyzeCVView: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         user_id = serializer.validated_data.get('user_id')
-        cv_id = serializer.validated_data.get(
-            'cv_id')
+        cv_id = serializer.validated_data.get('cv_id')
 
         try:
             ai_extracted_data = analyze_cv_with_ai(cv_id, user_id)
 
             response_serializer = AnalyzeCVResponseSerializer(data=ai_extracted_data)
             if response_serializer.is_valid():
-                logger.info(f"Анализ CV {cv_id} для пользователя {user_id} завершен успешно.")
+                logger.info(f"Аналіз CV {cv_id} для користувача {user_id} успішно завершено.")
                 return Response(response_serializer.data, status=status.HTTP_200_OK)
             else:
-                logger.error(
-                    f"ИИ вернул невалидные данные для CV {cv_id} пользователя {user_id}: {response_serializer.errors}")
-                return Response({"error": "ИИ вернул невалидные данные"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+                logger.warning(
+                    f"ШІ повернув недійсні дані для CV {cv_id} користувача {user_id}: {response_serializer.errors}")
+                return Response({"error": "ШІ повернув недійсні дані"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except ValidationError as e:
-            logger.warning(f"Ошибка валидации в сервисе analyze_cv_with_ai: {e}")
+            logger.warning(f"Помилка валідації в сервісі analyze_cv_with_ai: {e}")
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.error(f"Помилка в сервісі analyze_cv_with_ai: {e}", exc_info=True)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

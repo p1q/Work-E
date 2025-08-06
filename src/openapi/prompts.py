@@ -1,4 +1,4 @@
-VACANCY_ANALYSIS_PROMPT = f"""
+VACANCY_ANALYSIS_PROMPT = """
     Analyze the following job vacancy description and extract the specified parameters.
     Provide the result as a JSON object with the exact keys listed below.
     If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object.
@@ -21,7 +21,7 @@ VACANCY_ANALYSIS_PROMPT = f"""
     JSON Output:
     """
 
-CV_ANALYSIS_PROMPT = f"""
+CV_ANALYSIS_PROMPT = """
 Analyze the following candidate resume/CV and extract the specified parameters.
 Provide the result as a JSON object with the exact keys listed below.
 If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object.
