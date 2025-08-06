@@ -1,7 +1,9 @@
+import io
 import logging
 import os
 
 import google.generativeai as genai
+import pdfplumber
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from dotenv import load_dotenv
@@ -17,7 +19,7 @@ from rest_framework.views import APIView
 
 from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
-from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer
+from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer, User
 from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer
 from .serializers import ExtractTextFromCVRequestSerializer, ExtractTextFromCVResponseSerializer
 from ..models import CV
