@@ -55,7 +55,7 @@ def extract_text_from_cv(cv):
         raise ValidationError(f'Сталася неочікувана помилка під час обробки файлу резюме: {str(e)}')
 
 
-def analyze_cv_with_ai(cv_id, user_id):
+def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
     try:
         try:
             cv = CV.objects.get(id=cv_id, user_id=user_id)
@@ -63,9 +63,16 @@ def analyze_cv_with_ai(cv_id, user_id):
             logger.error(f"CV з ID {cv_id} для користувача {user_id} не знайдено.")
             raise ValidationError("CV не знайдено.")
 
-        cv_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
+        if cv_text_override is not None:
+            cv_text = cv_text_override
+            method_used = "provided_by_view"
+            extracted_cv_id = cv.id
+            filename = cv.cv_file.name if cv.cv_file else "unknown"
+            logger.debug(f"Використано текст CV, наданий з views.py, для CV {cv.id}.")
+        else:
+            cv_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
         if not cv_text:
-            logger.error(f"Не вдалося видобути текст з CV {cv_id} користувача {user_id}.")
+            logger.warning(f"Не вдалося видобути текст з CV {cv_id} користувача {user_id}.")
             raise ValidationError("Не вдалося видобути текст з резюме.")
 
         prompt = CV_ANALYSIS_PROMPT.format(cv_text=cv_text)

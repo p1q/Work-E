@@ -283,22 +283,18 @@ class AnalyzeCVView(APIView):
         validation_response = handle_serializer_validation(serializer, logger, "AnalyzeCVView")
         if validation_response:
             return validation_response
-
         user_id = serializer.validated_data.get('user_id')
 
         cv, error_response = _get_latest_cv_for_user(user_id, logger)
         if error_response:
             return error_response
-
         try:
             cv_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
-
             if not cv_text:
                 logger.warning(f"Не вдалося видобути текст з CV {cv.id} для користувача {user_id}")
                 return Response({'error': 'Не вдалося видобути текст з резюме.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            ai_extracted_data = analyze_cv_with_ai(cv_text, user_id)
-
+            ai_extracted_data = analyze_cv_with_ai(cv.id, user_id, cv_text_override=cv_text)
             response_serializer = AnalyzeCVResponseSerializer(data=ai_extracted_data)
             if response_serializer.is_valid():
                 logger.info(f"Аналіз CV {cv.id} для користувача {user_id} успішно завершено.")
@@ -307,7 +303,6 @@ class AnalyzeCVView(APIView):
                 logger.warning(
                     f"ШІ повернув недійсні дані для CV {cv.id} користувача {user_id}: {response_serializer.errors}")
                 return Response({"error": "ШІ повернув недійсні дані"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
         except ValidationError as e:
             logger.warning(f"Помилка валідації при аналізі CV для користувача {user_id}: {e.message}")
             if "не знайдено" in str(e) or "видобути текст" in str(e):
