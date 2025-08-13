@@ -101,12 +101,29 @@ class Currency(models.TextChoices):
     EUR = 'EUR', '€'
 
 
+class EnglishLevel(models.TextChoices):
+    A1 = 'A1', 'A1'
+    A2 = 'A2', 'A2'
+    B1 = 'B1', 'B1'
+    B2 = 'B2', 'B2'
+    C1 = 'C1', 'C1'
+    C2 = 'C2', 'C2'
+    NO_MATTER = 'NO_MATTER', 'Не має значення'
+
+
 class Vacancy(models.Model):
     class Meta:
         app_label = 'vacancy'
 
     title = models.CharField(max_length=255, verbose_name="Назва вакансії")
     link = models.URLField(blank=True, null=True, verbose_name="Посилання на вакансію")
+
+    english_level = models.CharField(
+        max_length=20,
+        choices=EnglishLevel.choices,
+        blank=True,
+        help_text="Необхідний рівень англійської"
+    )
 
     countries = ArrayField(
         models.CharField(max_length=2, choices=Country.choices),
