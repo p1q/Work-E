@@ -58,7 +58,7 @@ class VacancyListCreateView(generics.ListCreateAPIView):
 
         try:
             logger.info("Відправка тексту вакансії до ШІ для обробки.")
-            ai_extracted_data = extract_vacancy_data_with_ai(vacancy_text_override=vacancy_text)
+            ai_extracted_data = extract_vacancy_data(description_text=vacancy_text)
 
             if not ai_extracted_data:
                 logger.error("ШІ не повернув дані для вакансії.")
