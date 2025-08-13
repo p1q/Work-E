@@ -12,29 +12,32 @@ OPENAPI_AI_MODEL = getattr(settings, 'OPENAPI_AI_MODEL', 'qwen-max-latest')
 OPENAPI_AI_TIMEOUT = getattr(settings, 'OPENAPI_AI_TIMEOUT', 30)
 
 
-def call_openapi_ai(messages: list, model: str = None, chat_id: str = "", stream: bool = False) -> dict:
+def call_openapi_ai(messages: list, model: str = None, chat_id: str = "", stream: bool = False,
+                    temperature: float = 0.7) -> dict:
+    if not OPENAPI_AI_URL:
+        logger.error("OPENAPI_AI_URL не налаштовано в settings.")
+        return {}
+
     if model is None:
         model = OPENAPI_AI_MODEL
 
-    headers = {
-        'Content-Type': 'application/json',
-    }
+    headers = {'Content-Type': 'application/json'}
+
     data = {
         "model": model,
         "messages": messages,
         "chatId": chat_id,
-        "stream": stream
+        "stream": stream,
+        "temperature": temperature
     }
 
     try:
-        logger.debug(f"Calling OpenAPI AI at {OPENAPI_AI_URL} with model {model}")
+        logger.debug(f"Calling OpenAPI AI at {OPENAPI_AI_URL} with model {model} and temperature {temperature}")
         response = requests.post(OPENAPI_AI_URL, headers=headers, json=data, timeout=OPENAPI_AI_TIMEOUT)
         response.raise_for_status()
         ai_response = response.json()
-
         logger.info("OpenAPI AI call successful.")
         return ai_response
-
     except requests.exceptions.Timeout:
         logger.error(f"Timeout error calling OpenAPI AI (timeout={OPENAPI_AI_TIMEOUT}s)")
     except requests.exceptions.RequestException as e:
@@ -44,7 +47,6 @@ def call_openapi_ai(messages: list, model: str = None, chat_id: str = "", stream
             f"Error decoding JSON from OpenAPI AI response: {e}. Raw response text: {response.text[:500] if 'response' in locals() else 'N/A'}")
     except Exception as e:
         logger.error(f"Unexpected error in OpenAPI AI call: {e}", exc_info=True)
-
     return {}
 
 
