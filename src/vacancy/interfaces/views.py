@@ -24,7 +24,7 @@ class VacancyListCreateView(generics.ListCreateAPIView):
         if self.request.method == 'GET':
             permission_classes = [AllowAny]
         else:
-            permission_classes = [IsAuthenticated]
+            permission_classes = [AllowAny]
         return [permission() for permission in permission_classes]
 
     @extend_schema(responses={200: VACANCY_LIST_RESPONSE}, )
