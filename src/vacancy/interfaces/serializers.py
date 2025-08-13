@@ -11,18 +11,14 @@ class VacancySerializer(serializers.ModelSerializer):
     class Meta:
         model = Vacancy
         fields = [
-            'id', 'title', 'link', 'countries', 'cities', 'salary_min', 'salary_max', 'salary_currency',
-            'categories', 'date', 'description', 'skills', 'tools', 'responsibilities', 'languages'
+            'id', 'title', 'description', 'link', 'countries', 'cities',
+            'custom_eu_cities', 'salary_min', 'salary_max', 'salary_currency',
+            'is_remote', 'is_hybrid', 'english_level', 'location_field',
+            'skills', 'tools', 'responsibilities', 'categories'
         ]
-        read_only_fields = ['id', 'date']
+        read_only_fields = ['id']
 
     def validate(self, data):
-        countries = data.get('countries', [])
-        cities = data.get('cities', [])
-
-        if not countries and not cities:
-            raise serializers.ValidationError("Необхідно вибрати хоча б одну країну або місто.")
-
         salary_min = data.get('salary_min')
         salary_max = data.get('salary_max')
 
