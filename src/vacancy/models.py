@@ -118,12 +118,9 @@ class Vacancy(models.Model):
     title = models.CharField(max_length=255, verbose_name="Назва вакансії")
     link = models.URLField(blank=True, null=True, verbose_name="Посилання на вакансію")
 
-    english_level = models.CharField(
-        max_length=20,
-        choices=EnglishLevel.choices,
-        blank=True,
-        help_text="Необхідний рівень англійської"
-    )
+    english_level = models.CharField(max_length=20, choices=EnglishLevel.choices, blank=True, null=True,
+                                     help_text="Необхідний рівень англійської"
+                                     )
 
     countries = ArrayField(
         models.CharField(max_length=2, choices=Country.choices),
@@ -153,11 +150,13 @@ class Vacancy(models.Model):
 
     date = models.DateTimeField(auto_now_add=True, verbose_name="Дата додавання")
     description = models.TextField(verbose_name="Опис вакансії")
+
     skills = models.TextField(blank=True, null=True, verbose_name="Навички")
     tools = models.TextField(blank=True, null=True, verbose_name="Інструменти")
     responsibilities = models.TextField(blank=True, null=True, verbose_name="Обов'язки")
-    languages = models.TextField(blank=True, null=True, verbose_name="Мови")
 
+    languages = models.TextField(blank=True, null=True, verbose_name="Мови")
+    location = models.TextField(blank=True, null=True, verbose_name="Локація")  # Можливо, внутрішнє поле?
     is_remote = models.BooleanField(default=False, help_text="Чи є вакансія віддаленою?")
     is_hybrid = models.BooleanField(default=False, help_text="Чи є вакансія гібридною?")
 

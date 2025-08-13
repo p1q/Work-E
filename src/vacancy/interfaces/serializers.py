@@ -13,7 +13,7 @@ class VacancySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'link', 'countries', 'cities',
             'custom_eu_cities', 'salary_min', 'salary_max', 'salary_currency',
-            'is_remote', 'is_hybrid', 'english_level', 'location_field',
+            'is_remote', 'is_hybrid', 'english_level', 'location',
             'skills', 'tools', 'responsibilities', 'categories'
         ]
         read_only_fields = ['id']

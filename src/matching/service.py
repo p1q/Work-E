@@ -114,8 +114,8 @@ def create_or_update_match(user: User, vacancy: Vacancy):
             user_cv.willing_to_relocate,
             vacancy.is_remote,
             vacancy.is_hybrid,
-            user_cv.location_field,
-            vacancy.location_field
+            user_cv.location,
+            vacancy.location
     ):
         # Якщо не підходить за локацією/релокейтом, не створюємо матч
         Match.objects.filter(user=user, vacancy=vacancy).delete()
@@ -131,7 +131,7 @@ def create_or_update_match(user: User, vacancy: Vacancy):
     tools_match = calculate_similarity(user_cv.tools, vacancy.tools)
     responsibilities_match = calculate_similarity(user_cv.responsibilities, vacancy.responsibilities)
     languages_match = calculate_similarity(user_cv.languages, vacancy.languages)
-    location_match = calculate_location_match(user_cv.location_field, vacancy.location_field)
+    location_match = calculate_location_match(user_cv.location, vacancy.location)
     salary_match = calculate_salary_match(user_cv.salary_range, vacancy.salary_range)
 
     score = (

@@ -21,7 +21,7 @@ class CV(models.Model):
     tools = models.TextField(blank=True, null=True)
     responsibilities = models.TextField(blank=True, null=True)
     languages = models.TextField(blank=True, null=True)
-    location_field = models.TextField(blank=True, null=True)
+    location = models.TextField(blank=True, null=True)
     salary_range = models.CharField(max_length=255, blank=True, null=True)
 
     english_level = models.CharField(max_length=50, blank=True, null=True,
