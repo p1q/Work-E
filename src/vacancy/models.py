@@ -141,6 +141,9 @@ class Vacancy(models.Model):
     responsibilities = models.TextField(blank=True, null=True, verbose_name="Обов'язки")
     languages = models.TextField(blank=True, null=True, verbose_name="Мови")
 
+    is_remote = models.BooleanField(default=False, help_text="Чи є вакансія віддаленою?")
+    is_hybrid = models.BooleanField(default=False, help_text="Чи є вакансія гібридною?")
+
     def __str__(self):
         return self.title
 
