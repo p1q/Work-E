@@ -68,12 +68,6 @@ class VacancySerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="Чи є позиція гібридною (комбінація віддаленої/офісної роботи)?"
     )
-    location = serializers.CharField(
-        required=False,
-        allow_null=True,
-        max_length=100,
-        help_text="Місто розташування (тільки місто/село)"
-    )
     link = serializers.URLField(
         required=False,
         allow_null=True,
@@ -92,10 +86,8 @@ class VacancySerializer(serializers.ModelSerializer):
     class Meta:
         model = Vacancy
         fields = [
-            'id', 'title', 'description', 'link', 'countries', 'cities',
-            'skills', 'responsibilities', 'categories', 'languages', 'location',
-            'salary_min', 'salary_max', 'salary_currency', 'level',
-            'is_remote', 'is_hybrid'
+            'id', 'title', 'description', 'link', 'countries', 'cities', 'skills', 'responsibilities', 'categories',
+            'languages', 'salary_min', 'salary_max', 'salary_currency', 'level', 'is_remote', 'is_hybrid'
         ]
 
     def validate_categories(self, value):
