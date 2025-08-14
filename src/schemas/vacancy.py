@@ -8,10 +8,10 @@ VACANCY_SCHEMA_EXAMPLE = {
     'categories': ['Python', 'Backend'],
     'countries': ['UA', 'PL'],
     'cities': ['Kyiv', 'Warsaw'],
-    'location': 'Kyiv',  # Тільки місто
+    'location': 'Kyiv',
     'is_remote': True,
     'is_hybrid': False,
-    'languages': [  # Масив об'єктів
+    'languages': [
         {'language': 'English', 'level': 'B2'},
         {'language': 'Ukrainian', 'level': None}
     ],
@@ -110,4 +110,8 @@ VACANCY_CREATE_RESPONSE = OpenApiResponse(
     response={'$ref': '#/components/schemas/Vacancy'},
     description='Вакансію створено',
     examples=[OpenApiExample('Приклад створеної вакансії', value=VACANCY_SCHEMA_EXAMPLE)]
+)
+
+VACANCY_DELETE_RESPONSE = OpenApiResponse(
+    description='Вакансію видалено'
 )
