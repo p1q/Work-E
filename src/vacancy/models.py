@@ -124,7 +124,7 @@ class Vacancy(models.Model):
     location = models.TextField(blank=True, null=True, verbose_name="Локація")
     is_remote = models.BooleanField(default=False, help_text="Чи є вакансія повністю віддаленою?")
     is_hybrid = models.BooleanField(default=False, help_text="Чи є вакансія гібридною?")
-    languages = models.TextField(blank=True, null=True, verbose_name="Мови")
+    languages = models.JSONField(blank=True, null=True, verbose_name="Мови")
     skills = ArrayField(models.CharField(max_length=100), blank=True, default=list, verbose_name="Навички")
     responsibilities = ArrayField(models.TextField(), blank=True, default=list, verbose_name="Обов'язки")
     description = models.TextField(verbose_name="Опис вакансії")
@@ -136,16 +136,6 @@ class Vacancy(models.Model):
 
     def __str__(self):
         return self.title
-
-    @property
-    def salary_range(self):
-        if self.salary_min is not None and self.salary_max is not None and self.salary_currency:
-            return f"{self.salary_min}-{self.salary_max} {self.get_salary_currency_display()}"
-        elif self.salary_min is not None and self.salary_currency:
-            return f"від {self.salary_min} {self.get_salary_currency_display()}"
-        elif self.salary_max is not None and self.salary_currency:
-            return f"до {self.salary_max} {self.get_salary_currency_display()}"
-        return None
 
     @property
     def location(self):
