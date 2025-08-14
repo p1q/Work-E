@@ -19,9 +19,9 @@ class VacancySerializer(serializers.ModelSerializer):
         required=False,
         help_text="Обов'язки"
     )
-    languages = serializers.ListField(
-        child=serializers.DictField(),
+    languages = serializers.JSONField(
         required=False,
+        allow_null=True,
         help_text="Мови та рівні: [{'language': 'English', 'level': 'B2'}, ...]"
     )
     countries = serializers.ListField(
