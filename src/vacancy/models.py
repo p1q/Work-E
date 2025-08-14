@@ -117,27 +117,22 @@ class Vacancy(models.Model):
 
     title = models.CharField(max_length=255, verbose_name="Назва вакансії")
     link = models.URLField(blank=True, null=True, verbose_name="Посилання на вакансію")
-    english_level = models.CharField(max_length=20, choices=EnglishLevel.choices, blank=True, null=True,
-                                     help_text="Необхідний рівень англійської")
-    countries = ArrayField(models.CharField(max_length=2, choices=Country.choices), blank=True, default=list,
-                           verbose_name="Країни")
-    cities = ArrayField(models.CharField(max_length=50, choices=City.choices), blank=True, default=list,
-                        verbose_name="Міста")
+    level = models.CharField(max_length=50, blank=True, null=True, verbose_name="Рівень кандидата")
+    categories = ArrayField(models.CharField(max_length=100), verbose_name="Категорії", default=list, blank=True)
+    countries = ArrayField(models.CharField(max_length=50), verbose_name="Країни", default=list, blank=True)
+    cities = ArrayField(models.CharField(max_length=50), verbose_name="Міста", default=list, blank=True)
+    location = models.TextField(blank=True, null=True, verbose_name="Локація")
+    is_remote = models.BooleanField(default=False, help_text="Чи є вакансія повністю віддаленою?")
+    is_hybrid = models.BooleanField(default=False, help_text="Чи є вакансія гібридною?")
+    languages = models.TextField(blank=True, null=True, verbose_name="Мови")
+    skills = ArrayField(models.CharField(max_length=100), blank=True, default=list, verbose_name="Навички")
+    responsibilities = ArrayField(models.TextField(), blank=True, default=list, verbose_name="Обов'язки")
+    description = models.TextField(verbose_name="Опис вакансії")
     salary_min = models.PositiveIntegerField(blank=True, null=True, verbose_name="Мінімальна зарплата")
     salary_max = models.PositiveIntegerField(blank=True, null=True, verbose_name="Максимальна зарплата")
     salary_currency = models.CharField(max_length=3, choices=Currency.choices, blank=True, null=True,
                                        verbose_name="Валюта зарплати")
-    categories = ArrayField(models.CharField(max_length=100), verbose_name="Категорії", default=list, blank=True)
     date = models.DateTimeField(auto_now_add=True, verbose_name="Дата додавання")
-    description = models.TextField(verbose_name="Опис вакансії")
-    level = models.CharField(max_length=50, blank=True, null=True, verbose_name="Рівень")
-    skills = ArrayField(models.CharField(max_length=100), blank=True, default=list, verbose_name="Навички")
-    responsibilities = ArrayField(models.TextField(), blank=True, default=list, verbose_name="Обов'язки")
-    languages = models.TextField(blank=True, null=True, verbose_name="Мови")
-    location = models.TextField(blank=True, null=True, verbose_name="Локація")
-    willing_to_relocate = models.BooleanField(default=False, help_text="Чи готовий до переїзду?")
-    is_remote = models.BooleanField(default=False, help_text="Чи є вакансія віддаленою?")
-    is_hybrid = models.BooleanField(default=False, help_text="Чи є вакансія гібридною?")
 
     def __str__(self):
         return self.title

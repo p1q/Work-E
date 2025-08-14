@@ -1,24 +1,27 @@
 VACANCY_ANALYSIS_PROMPT = """
-    Analyze the following job vacancy description and extract the specified parameters.
+    Analyze the following job vacancy text and extract the specified parameters.
     Provide the result as a JSON object with the exact keys listed below.
-    If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object.
+    If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object or as explicitly stated.
 
     Parameters to extract:
-    1. title: String. Title of the vacancy
-    2. description: String. Description of the vacancy
-    3. categories: Array of strings. One or more categories to which this vacancy can be assigned (e.g., ["Java", "Fullstack"]). In most cases, there should be one main category!
-    4. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
-    5. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. If no level, use null for level.
-    6. location: String. The candidate's location mentioned (e.g., "Kyiv", "Lviv", "Odesa"). Only city/town here, do not add area or country!
-    7. salary_range: String. The salary range mentioned, in the format "min-max currency" (e.g., "50000-70000 UAH", "60000 EUR"). If not specified, null.
-    8. level: String. The experience level required (e.g., "Junior", "Middle", "Senior", "Lead"). If not specified, null.
-    9. english_level: String. The required English proficiency level (e.g., "A1", "A2", "B1", "B2", "C1", "C2"). If not specified, null.
-    10. is_remote: Boolean. Is the position fully remote? (true/false). If not specified or unclear, null.
-    11. is_hybrid: Boolean. Is the position hybrid (mix of remote/office)? (true/false). If not specified or unclear, null.
-    12. willing_to_relocate: Boolean. Is the candidate expected to relocate? (true/false). If not specified or unclear, null.
-    13. responsibilities: Array of strings. Key responsibilities listed (e.g., ["Develop web applications", "Write unit tests"]).
+    1. title: String. Title of the vacancy. If not specified, come up with a short one.
+    2. link: String. Link to the vacancy on a website. If not specified, null.
+    3. level: String. The experience level required (e.g., "Junior", "Middle", "Senior", "Lead"). If not specified, null.
+    4. categories: Array of strings. One or more categories to which this vacancy can be assigned (e.g., ["Java", "Fullstack"]). In most cases, there should be one main category!
+    5. countries: Array of strings. Which countries are candidates considered from? If not specified, null.
+    6. cities: Array of strings. Which cities are candidates considered from? If not specified, null.
+    7. location: String. The candidate's location mentioned (e.g., "Kyiv", "Lviv", "Odesa"). Only city/town here, do not add area or country!
+    8. is_remote: Boolean. Is the position fully remote? (true/false). If not specified or unclear, null. A vacancy cannot be both fully remote and hybrid at the same time!
+    9. is_hybrid: Boolean. Is the position hybrid (mix of remote/office)? (true/false). If not specified or unclear, null. A vacancy cannot be both fully remote and hybrid at the same time!
+    10. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. If no level, use null for level.    
+    11. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
+    12. responsibilities: Array of strings. Key responsibilities listed (e.g., ["Develop web applications", "Write unit tests"]).        
+    13. description: String. Description of the vacancy. If not specified, null.
+    14. salary_min: Positive Integer. Minimum salary amount (e.g. 50000). If not specified, null.
+    15. salary_max: Positive Integer. Maximum salary amount (e.g. 70000). If not specified, null.
+    16. salary_currency: String. Currency of salary (e.g., "UAH", "EUR"). If not specified, null.
 
-    Job Description:
+    Job Original Text:
     {vacancy_text}
 
     JSON Output:

@@ -109,7 +109,6 @@ def create_or_update_match(user: User, vacancy: Vacancy):
     if not user_cv:
         return None
 
-    # Перевірка нових критеріїв
     if not check_relocation_match(
             user_cv.willing_to_relocate,
             vacancy.is_remote,
