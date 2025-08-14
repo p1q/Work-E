@@ -150,13 +150,10 @@ class Vacancy(models.Model):
 
     date = models.DateTimeField(auto_now_add=True, verbose_name="Дата додавання")
     description = models.TextField(verbose_name="Опис вакансії")
-
-    skills = models.TextField(blank=True, null=True, verbose_name="Навички")
-    tools = models.TextField(blank=True, null=True, verbose_name="Інструменти")
-    responsibilities = models.TextField(blank=True, null=True, verbose_name="Обов'язки")
-
+    skills = ArrayField(models.CharField(max_length=100), blank=True, default=list, verbose_name="Навички")
+    responsibilities = ArrayField(models.TextField(), blank=True, default=list, verbose_name="Обов'язки")
     languages = models.TextField(blank=True, null=True, verbose_name="Мови")
-    location = models.TextField(blank=True, null=True, verbose_name="Локація")  # Можливо, внутрішнє поле?
+    location = models.TextField(blank=True, null=True, verbose_name="Локація")
     is_remote = models.BooleanField(default=False, help_text="Чи є вакансія віддаленою?")
     is_hybrid = models.BooleanField(default=False, help_text="Чи є вакансія гібридною?")
 
