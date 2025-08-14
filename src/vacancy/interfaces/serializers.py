@@ -4,7 +4,8 @@ from vacancy.models import Vacancy, VacancyCategory, Country, City, Currency
 
 
 class VacancySerializer(serializers.ModelSerializer):
-    categories = serializers.MultipleChoiceField(choices=VacancyCategory.choices, help_text="Категорії вакансії")
+    categories = serializers.ListField(child=serializers.CharField(max_length=100), required=False,
+                                       help_text="Категорії вакансії")
     skills = serializers.ListField(child=serializers.CharField(), required=False,
                                    help_text="Ключові технічні навички та технології")
     responsibilities = serializers.ListField(child=serializers.CharField(), required=False,
@@ -12,6 +13,7 @@ class VacancySerializer(serializers.ModelSerializer):
     countries = serializers.MultipleChoiceField(choices=Country.choices, required=False, help_text="Країни")
     cities = serializers.MultipleChoiceField(choices=City.choices, required=False, help_text="Міста або 'Віддалено'")
     salary_currency = serializers.ChoiceField(choices=Currency.choices, required=False, help_text="Валюта зарплати")
+    languages = serializers.ListField(child=serializers.DictField(), required=False, help_text="Мови")
 
     class Meta:
         model = Vacancy
