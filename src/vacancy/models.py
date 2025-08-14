@@ -150,10 +150,12 @@ class Vacancy(models.Model):
 
     date = models.DateTimeField(auto_now_add=True, verbose_name="Дата додавання")
     description = models.TextField(verbose_name="Опис вакансії")
+    level = models.CharField(max_length=50, blank=True, null=True, verbose_name="Рівень")
     skills = ArrayField(models.CharField(max_length=100), blank=True, default=list, verbose_name="Навички")
     responsibilities = ArrayField(models.TextField(), blank=True, default=list, verbose_name="Обов'язки")
     languages = models.TextField(blank=True, null=True, verbose_name="Мови")
     location = models.TextField(blank=True, null=True, verbose_name="Локація")
+    willing_to_relocate = models.BooleanField(default=False, help_text="Чи готовий до переїзду?")
     is_remote = models.BooleanField(default=False, help_text="Чи є вакансія віддаленою?")
     is_hybrid = models.BooleanField(default=False, help_text="Чи є вакансія гібридною?")
 
