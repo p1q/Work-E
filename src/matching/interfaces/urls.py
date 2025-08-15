@@ -1,7 +1,6 @@
 from django.urls import path
-from matching.interfaces.views import MatchListView, MatchDetailView
+from matching.interfaces.views import MatchesForUserView
 
 urlpatterns = [
-    path('matches/', MatchListView.as_view(), name='match-list'),
-    path('matches/<int:pk>/', MatchDetailView.as_view(), name='match-detail'),
+    path('<int:user_id>/', MatchesForUserView.as_view(), name='matches-for-user'),
 ]
