@@ -3,7 +3,7 @@ import random
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny  # <-- Додано імпорт
+from rest_framework.permissions import AllowAny
 from cvs.models import CV
 from vacancy.models import Vacancy
 from matching.models import Match
@@ -12,7 +12,7 @@ from cvs.interfaces.views import _get_latest_cv_for_user
 logger = logging.getLogger(__name__)
 
 
-def calculate_match(cv, vacancy):
+def calculate_match():
     return {
         'score': round(random.uniform(50, 100), 2),
         'match_quality': random.choice(['Low', 'Medium', 'High']),
@@ -26,9 +26,9 @@ def calculate_match(cv, vacancy):
 
 
 class MatchesForUserView(APIView):
-    permission_classes = [AllowAny]  # <-- Явно дозволяємо доступ всім
+    permission_classes = [AllowAny]
 
-    def get(self, request, user_id):
+    def get(self, user_id):
         logger.info(f"Отримання матчів для користувача {user_id}")
 
         cv, error_response = _get_latest_cv_for_user(user_id, logger)
