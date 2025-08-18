@@ -29,10 +29,32 @@ class CVSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(write_only=True)
     cv_file = serializers.FileField(write_only=True)
 
+    level = serializers.CharField(required=False, allow_null=True)
+    categories = serializers.ListField(child=serializers.CharField(max_length=100), required=False)
+    countries = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
+    cities = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
+    is_remote = serializers.BooleanField(required=False, allow_null=True)
+    is_hybrid = serializers.BooleanField(required=False, allow_null=True)
+    willing_to_relocate = serializers.BooleanField(required=False, allow_null=True)
+    languages = serializers.JSONField(source='languages_detailed', required=False, allow_null=True)
+    skills = serializers.ListField(child=serializers.CharField(max_length=100), source='skills_detailed',
+                                   required=False)
+    salary_min = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    salary_max = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    salary_currency = serializers.CharField(required=False, allow_null=True, max_length=3)
+    analyzed = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = CV
-        fields = ['id', 'user', 'email', 'filename', 'cv_file', 'uploaded_at']
-        read_only_fields = ['id', 'user', 'filename', 'uploaded_at']
+        fields = [
+            'id', 'user', 'email', 'filename', 'cv_file', 'uploaded_at',
+            'level', 'categories', 'countries', 'cities',
+            'is_remote', 'is_hybrid', 'willing_to_relocate',
+            'languages', 'skills',
+            'salary_min', 'salary_max', 'salary_currency',
+            'analyzed'
+        ]
+        read_only_fields = ['id', 'user', 'filename', 'uploaded_at', 'analyzed']
 
     def validate_cv_file(self, file):
         # 1) Size checks
@@ -110,11 +132,13 @@ class AnalyzeCVRequestSerializer(serializers.Serializer):
 class AnalyzeCVResponseSerializer(serializers.Serializer):
     skills = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
     languages = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
-    location = serializers.CharField(required=False, allow_null=True)
-    salary_range = serializers.CharField(required=False, allow_null=True)
     level = serializers.CharField(required=False, allow_null=True)
-    english_level = serializers.CharField(required=False, allow_null=True)
+    categories = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    countries = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    cities = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
     is_remote = serializers.BooleanField(required=False, allow_null=True)
     is_hybrid = serializers.BooleanField(required=False, allow_null=True)
     willing_to_relocate = serializers.BooleanField(required=False, allow_null=True)
-    responsibilities = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    salary_min = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    salary_max = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    salary_currency = serializers.CharField(required=False, allow_null=True)
