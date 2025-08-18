@@ -16,6 +16,7 @@ class CV(models.Model):
     categories = ArrayField(models.CharField(max_length=100), default=list, blank=True)
     countries = ArrayField(models.CharField(max_length=50), default=list, blank=True)
     cities = ArrayField(models.CharField(max_length=50), default=list, blank=True)
+    is_office = models.BooleanField(null=True, blank=True)
     is_remote = models.BooleanField(null=True, blank=True)
     is_hybrid = models.BooleanField(null=True, blank=True)
     willing_to_relocate = models.BooleanField(null=True, blank=True)

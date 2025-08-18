@@ -33,6 +33,7 @@ class CVSerializer(serializers.ModelSerializer):
     categories = serializers.ListField(child=serializers.CharField(max_length=100), required=False)
     countries = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
     cities = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
+    is_office = serializers.BooleanField(required=False, allow_null=True)
     is_remote = serializers.BooleanField(required=False, allow_null=True)
     is_hybrid = serializers.BooleanField(required=False, allow_null=True)
     willing_to_relocate = serializers.BooleanField(required=False, allow_null=True)
@@ -49,7 +50,7 @@ class CVSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'email', 'filename', 'cv_file', 'uploaded_at',
             'level', 'categories', 'countries', 'cities',
-            'is_remote', 'is_hybrid', 'willing_to_relocate',
+            'is_office', 'is_remote', 'is_hybrid', 'willing_to_relocate',
             'languages', 'skills',
             'salary_min', 'salary_max', 'salary_currency',
             'analyzed'
@@ -136,6 +137,7 @@ class AnalyzeCVResponseSerializer(serializers.Serializer):
     categories = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
     countries = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
     cities = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+    is_office = serializers.BooleanField(required=False, allow_null=True)
     is_remote = serializers.BooleanField(required=False, allow_null=True)
     is_hybrid = serializers.BooleanField(required=False, allow_null=True)
     willing_to_relocate = serializers.BooleanField(required=False, allow_null=True)

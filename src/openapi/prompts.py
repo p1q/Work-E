@@ -37,14 +37,15 @@ CV_ANALYSIS_PROMPT = """
     2. categories: Array of strings. One or more categories to which this CV can be assigned (e.g., ["Java", "Fullstack"]). In most cases, there should be one main category!
     3. countries: Array of strings. Which countries are considered in this CV? If not specified, null.
     4. cities: Array of strings. Which cities are considered in this CV? (e.g., "Kyiv", "Lviv", "Odesa"). Only cities/towns here, do not add area or country! If not specified, null.
-    5. is_remote: Boolean. Does this CV only consider fully remote work? (true/false). If not specified or unclear, null. Cannot be both fully remote and hybrid at the same time!
-    6. is_hybrid: Boolean. Does this CV only consider hybrid work (mix of remote/office)? (true/false). If not specified or unclear, null. Cannot be both fully remote and hybrid at the same time!
-    7. willing_to_relocate: Boolean. Is the candidate in this CV willing to relocate? (true/false). If not specified or unclear, null.
-    8. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. Available options: "A1", "A2", "B1", "B2", "C1", "C2". If no level, use null for level.
-    9. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
-    10. salary_min: Positive Integer. Minimum salary amount (e.g. 50000). If not specified, null.
-    11. salary_max: Positive Integer. Maximum salary amount (e.g. 70000). If not specified, null.
-    12. salary_currency: String. Currency of salary (e.g., "UAH", "EUR"). If not specified, null.
+    5. is_office: Boolean. Does this CV consider full office work? (true/false). If not specified or unclear, null.
+    6. is_remote: Boolean. Does this CV consider fully remote work? (true/false). If not specified or unclear, null.
+    7. is_hybrid: Boolean. Does this CV consider hybrid work (mix of remote/office)? (true/false). If not specified or unclear, null.
+    8. willing_to_relocate: Boolean. Is the candidate in this CV willing to relocate? (true/false). If not specified or unclear, null.
+    9. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. Available options: "A1", "A2", "B1", "B2", "C1", "C2". If no level, use null for level.
+    10. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
+    11. salary_min: Positive Integer. Minimum salary amount (e.g. 50000). If not specified, null.
+    12. salary_max: Positive Integer. Maximum salary amount (e.g. 70000). If not specified, null.
+    13. salary_currency: String. Currency of salary (e.g., "UAH", "EUR"). If not specified, null.
     
     Candidate Resume/CV Text:
     {cv_text}
