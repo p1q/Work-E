@@ -2,6 +2,7 @@ VACANCY_ANALYSIS_PROMPT = """
     Analyze the following job vacancy text and extract the specified parameters.
     Provide the result as a JSON object with the exact keys listed below.
     If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object or as explicitly stated.
+    If the vacancy is written in a language other than English, it must be translated into English and returned in its entirety in English!
 
     Parameters to extract:
     1. title: String. Title of the vacancy. If not specified, come up with a short one.
@@ -31,6 +32,7 @@ CV_ANALYSIS_PROMPT = """
 Analyze the following candidate resume/CV and extract the specified parameters.
 Provide the result as a JSON object with the exact keys listed below.
 If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object.
+If the CV is written in a language other than English, it must be translated into English and returned in its entirety in English!
 
 Parameters to extract:
 1. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
