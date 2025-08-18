@@ -10,17 +10,16 @@ VACANCY_ANALYSIS_PROMPT = """
     3. level: String. The experience level required (e.g., "Junior", "Middle", "Senior", "Lead"). If not specified, null.
     4. categories: Array of strings. One or more categories to which this vacancy can be assigned (e.g., ["Java", "Fullstack"]). In most cases, there should be one main category!
     5. countries: Array of strings. Which countries are candidates considered from? If not specified, null.
-    6. cities: Array of strings. Which cities are candidates considered from? If not specified, null.
-    7. location: String. The candidate's location mentioned (e.g., "Kyiv", "Lviv", "Odesa"). Only city/town here, do not add area or country!
-    8. is_remote: Boolean. Is the position fully remote? (true/false). If not specified or unclear, null. A vacancy cannot be both fully remote and hybrid at the same time!
-    9. is_hybrid: Boolean. Is the position hybrid (mix of remote/office)? (true/false). If not specified or unclear, null. A vacancy cannot be both fully remote and hybrid at the same time!
-    10. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. If no level, use null for level.    
-    11. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
-    12. responsibilities: Array of strings. Key responsibilities listed (e.g., ["Develop web applications", "Write unit tests"]).        
-    13. description: String. Description of the vacancy. If not specified, null.
-    14. salary_min: Positive Integer. Minimum salary amount (e.g. 50000). If not specified, null.
-    15. salary_max: Positive Integer. Maximum salary amount (e.g. 70000). If not specified, null.
-    16. salary_currency: String. Currency of salary (e.g., "UAH", "EUR"). If not specified, null.
+    6. cities: Array of strings. Which cities are candidates considered from? (e.g., "Kyiv", "Lviv", "Odesa"). Only cities/towns here, do not add area or country! If not specified, null.
+    7. is_remote: Boolean. Is the position fully remote? (true/false). If not specified or unclear, null. A vacancy cannot be both fully remote and hybrid at the same time!
+    8. is_hybrid: Boolean. Is the position hybrid (mix of remote/office)? (true/false). If not specified or unclear, null. A vacancy cannot be both fully remote and hybrid at the same time!
+    9. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. Available options: "A1", "A2", "B1", "B2", "C1", "C2". If no level, use null for level.
+    10. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
+    11. responsibilities: Array of strings. Key responsibilities listed (e.g., ["Develop web applications", "Write unit tests"]).        
+    12. description: String. Description of the vacancy. If not specified, null.
+    13. salary_min: Positive Integer. Minimum salary amount (e.g. 50000). If not specified, null.
+    14. salary_max: Positive Integer. Maximum salary amount (e.g. 70000). If not specified, null.
+    15. salary_currency: String. Currency of salary (e.g., "UAH", "EUR"). If not specified, null.
 
     Job Original Text:
     {vacancy_text}
@@ -29,25 +28,28 @@ VACANCY_ANALYSIS_PROMPT = """
     """
 
 CV_ANALYSIS_PROMPT = """
-Analyze the following candidate resume/CV and extract the specified parameters.
-Provide the result as a JSON object with the exact keys listed below.
-If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object.
-If the CV is written in a language other than English, it must be translated into English and returned in its entirety in English!
-
-Parameters to extract:
-1. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
-2. languages: Array of objects. Languages mentioned, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. If no level, use null for level.
-3. location: String. The candidate's location mentioned (e.g., "Kyiv", "Lviv", "Odesa").  Only city/town here, do not add area or country!
-4. salary_range: String. The candidate's expected salary range mentioned, in the format "min-max currency" (e.g., "50000-70000 UAH", "60000 EUR", "Negotiable"). If not specified, null.
-5. level: String. The candidate's experience level implied (e.g., "Junior", "Middle", "Senior", "Lead"). If not specified, null.
-6. english_level: String. The candidate's stated or implied English proficiency level (e.g., "A1", "A2", "B1", "B2", "C1", "C2"). If not specified, null.
-7. is_remote: Boolean. Is the candidate open to remote work? (true/false). If not specified or unclear, null.
-8. is_hybrid: Boolean. Is the candidate open to hybrid work? (true/false). If not specified or unclear, null.
-9. willing_to_relocate: Boolean. Is the candidate willing to relocate? (true/false). If not specified or unclear, null.
-10. responsibilities: Array of strings. Key responsibilities or achievements listed in previous roles (e.g., ["Developed web applications", "Led a team of 5 developers"]).
-
-Candidate Resume/CV Text:
-{cv_text}
-
-JSON Output:
-"""
+    Analyze the following candidate resume/CV and extract the specified parameters.
+    Provide the result as a JSON object with the exact keys listed below.
+    If a parameter cannot be determined or is not mentioned, leave its value as null or an empty list/object.
+    If the CV is written in a language other than English, it must be translated into English and returned in its entirety in English!
+    
+    Parameters to extract:
+    1. level: String. The candidate's experience level implied (Available options: "Trainee", "Junior", "Middle", "Senior", "Lead", "C-Level"). If not specified, null.
+    2. categories: Array of strings. One or more categories to which this CV can be assigned (e.g., ["Java", "Fullstack"]). In most cases, there should be one main category!
+    3. countries: Array of strings. Which countries are considered in this CV? If not specified, null.
+    4. cities: Array of strings. Which cities are considered in this CV? (e.g., "Kyiv", "Lviv", "Odesa"). Only cities/towns here, do not add area or country! If not specified, null.
+    5. is_remote: Boolean. Does this CV only consider fully remote work? (true/false). If not specified or unclear, null. Cannot be both fully remote and hybrid at the same time!
+    6. is_hybrid: Boolean. Does this CV only consider hybrid work (mix of remote/office)? (true/false). If not specified or unclear, null. Cannot be both fully remote and hybrid at the same time!
+    7. willing_to_relocate: Boolean. Is the candidate in this CV willing to relocate? (true/false). If not specified or unclear, null.
+    8. languages: Array of objects. Languages required, including proficiency level if mentioned. Format: [{{"language": "English", "level": "B2"}}, ...]. Available options: "A1", "A2", "B1", "B2", "C1", "C2". If no level, use null for level.
+    9. skills: Array of strings. Key technical skills,  technologies, specific tools, and competencies mentioned (e.g., ["Python", "Django", "Git", "Docker", "AWS", "REST API"]).
+    10. responsibilities: Array of strings. Key responsibilities or achievements listed in previous roles (e.g., ["Developed web applications", "Led a team of 5 developers"]).
+    11. salary_min: Positive Integer. Minimum salary amount (e.g. 50000). If not specified, null.
+    12. salary_max: Positive Integer. Maximum salary amount (e.g. 70000). If not specified, null.
+    13. salary_currency: String. Currency of salary (e.g., "UAH", "EUR"). If not specified, null.
+    
+    Candidate Resume/CV Text:
+    {cv_text}
+    
+    JSON Output:
+    """
