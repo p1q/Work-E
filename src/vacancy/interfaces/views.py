@@ -1,11 +1,13 @@
 import logging
 
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from openapi.service import extract_vacancy_data
 from rest_framework import serializers
 from rest_framework import status, generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from vacancy.models import Vacancy
 
 from src.schemas.vacancy import (VACANCY_LIST_RESPONSE, VACANCY_DETAIL_RESPONSE, VACANCY_DELETE_RESPONSE)
@@ -108,3 +110,40 @@ class VacancyRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     @extend_schema(responses={204: VACANCY_DELETE_RESPONSE}, )
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+
+
+class VacancyListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_cv = CV.objects.filter(user=request.user).first()
+        if not user_cv:
+            return Response({"error": "CV not found"}, status=400)
+
+        languages_filter = Q()
+        if user_cv.languages:
+            for language in user_cv.languages:
+                languages_filter &= Q(languages__contains=[language['language']])
+
+        level_filter = Q()
+        if user_cv.level:
+            level_filter &= Q(level=user_cv.level)
+
+        categories_filter = Q()
+        if user_cv.categories:
+            categories_filter &= Q(categories__contains=[user_cv.categories[0]])
+
+        location_filter = Q()
+        if user_cv.countries and user_cv.cities:
+            location_filter &= Q(countries__in=user_cv.countries, cities__in=user_cv.cities)
+
+        salary_filter = Q()
+        if user_cv.salary_min and user_cv.salary_max:
+            salary_filter &= Q(salary_min__gte=user_cv.salary_min, salary_max__lte=user_cv.salary_max)
+
+        vacancies = Vacancy.objects.filter(
+            languages_filter & level_filter & categories_filter & location_filter & salary_filter
+        )
+
+        serializer = VacancySerializer(vacancies, many=True)
+        return Response(serializer.data)

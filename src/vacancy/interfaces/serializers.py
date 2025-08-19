@@ -86,7 +86,7 @@ class VacancySerializer(serializers.ModelSerializer):
     class Meta:
         model = Vacancy
         fields = [
-            'id', 'title', 'description', 'link', 'countries', 'cities', 'skills', 'responsibilities', 'categories',
+            'id', 'title', 'description', 'link', 'countries', 'cities', 'skills', 'categories',
             'languages', 'salary_min', 'salary_max', 'salary_currency', 'level', 'is_remote', 'is_hybrid'
         ]
 
