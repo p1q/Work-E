@@ -14,7 +14,7 @@ class CVGenerationSerializer(serializers.Serializer):
     name = serializers.CharField()
     lastname = serializers.CharField()
     experience = serializers.ListField(child=serializers.DictField())
-    skills = serializers.ListField(child=serializers.DictField())
+    skills = serializers.ListField(child=serializers.CharField())
     education = serializers.ListField(child=serializers.DictField())
 
 
