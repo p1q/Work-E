@@ -14,11 +14,6 @@ class VacancySerializer(serializers.ModelSerializer):
         required=False,
         help_text="Ключові технічні навички та технології"
     )
-    responsibilities = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        help_text="Обов'язки"
-    )
     languages = serializers.JSONField(
         required=False,
         allow_null=True,
