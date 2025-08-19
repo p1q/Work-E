@@ -8,7 +8,7 @@ VACANCY_ANALYSIS_PROMPT = """
     1. title: String. Title of the vacancy. If not specified, come up with a short one.
     2. link: String. Link to the vacancy on a website. If not specified, null.
     3. level: String. The experience level required (e.g., "Junior", "Middle", "Senior", "Lead"). If not specified, null.
-    4. categories: Array of strings. One or more categories to which this vacancy can be assigned (e.g., ["Java", "Fullstack"]). In most cases, there should be one main category!
+    4. categories: Array of strings. Only one main category to which this vacancy can be assigned (e.g., ["Java", "DevOps"]).
     5. countries: Array of strings. Which countries are candidates considered from? If not specified, null.
     6. cities: Array of strings. Which cities are candidates considered from? (e.g., "Kyiv", "Lviv", "Odesa"). Only cities/towns here, do not add area or country! If not specified, null.
     7. is_remote: Boolean. Is the position fully remote? (true/false). If not specified or unclear, null. A vacancy cannot be both fully remote and hybrid at the same time!
@@ -34,7 +34,7 @@ CV_ANALYSIS_PROMPT = """
     
     Parameters to extract:
     1. level: String. The candidate's experience level implied (Available options: "Trainee", "Junior", "Middle", "Senior", "Lead", "C-Level"). If not specified, null.
-    2. categories: Array of strings. One or more categories to which this CV can be assigned (e.g., ["Java", "Fullstack"]). In most cases, there should be one main category!
+    2. categories: Array of strings. Only one main category to which this CV can be assigned (e.g., ["Java", "DevOps"]).
     3. countries: Array of strings. Which countries are considered in this CV? If not specified, null.
     4. cities: Array of strings. Which cities are considered in this CV? (e.g., "Kyiv", "Lviv", "Odesa"). Only cities/towns here, do not add area or country! If not specified, null.
     5. is_office: Boolean. Does this CV consider full office work? (true/false). If not specified or unclear, null.
