@@ -29,7 +29,15 @@ def convert_to_usd(amount, currency):
 class MatchesForUserView(APIView):
     permission_classes = [AllowAny]
 
-    def get(self, user_id):
+    def get(self, request, *args, **kwargs):
+        user_id = kwargs.get('user_id')
+        if user_id is None:
+             return Response({'error': 'user_id is required'}, status=400)
+        try:
+             user_id = int(user_id)
+        except (ValueError, TypeError):
+             return Response({'error': 'Invalid user_id'}, status=400)
+
         logger.info(f"Отримання матчів для користувача {user_id}")
 
         # 1. Отримуємо користувача
