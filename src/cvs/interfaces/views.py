@@ -58,7 +58,7 @@ def handle_serializer_validation(serializer, logger, view_name):
 
 
 @method_decorator(
-    ratelimit(key='ip', rate='1/m', method='POST', block=True),
+    ratelimit(key='ip', rate='3/m', method='POST', block=True),
     name='post'
 )
 @extend_schema(
@@ -80,20 +80,66 @@ class GenerateCVView(APIView):
 
         profile_data = serializer.validated_data
 
-        # Clear prompt to guide the model better with structure and output format
+        profile_str = f"Name: {profile_data.get('name')} {profile_data.get('lastname')}\n\n"
+
+        profile_str += "Experience:\n"
+        for exp in profile_data.get('experience', []):
+            responsibilities = exp.get("responsibilities", [])
+            resp_str = "\n  ".join([f"- {r}" for r in responsibilities])
+            profile_str += f"- {exp.get('role')} at {exp.get('company')} ({exp.get('duration')}):\n  {resp_str}\n"
+
+        profile_str += "\nSkills:\n"
+        for skill in profile_data.get('skills', []):
+            profile_str += f"- {skill}\n"
+
+        profile_str += "\nEducation:\n"
+        for edu in profile_data.get('education', []):
+            profile_str += f"- {edu.get('degree')} at {edu.get('institution')} ({edu.get('year')})\n"
+
         prompt = (
-            "You are a helpful assistant that generates a professional CV in Markdown format.\n"
-            "Use the following structured user profile data:\n"
-            f"{profile_data}\n\n"
-            "Format the output as a clean Markdown CV with sections: Contact, Summary, Experience, Skills, Education.\n"
-            "Use bullet points and headers as appropriate.\n"
-            "Do not include any extra text or explanation."
+            "You are a professional CV writer.\n"
+            "Using the structured profile data below, generate a complete CV in Markdown format.\n"
+            "The CV must always include the sections: Contact, Summary, Experience, Skills, and Education.\n"
+            "If some information is missing, make reasonable assumptions.\n"
+            "Do not leave the CV empty, and do not include explanations outside the CV.\n"
+            f"---\n{profile_str}\n---\n"
         )
 
         try:
             model = genai.GenerativeModel('gemini-2.5-pro')
-            response = model.generate_content(prompt)
-            return Response({'cv': response.text}, status=status.HTTP_200_OK)
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=5000,
+                )
+            )
+
+            # Try the quick accessor first
+            generated_text = getattr(response, "text", None)
+
+            # Fallback to candidates->parts if .text is empty
+            if not generated_text and response.candidates:
+                for candidate in response.candidates:
+                    if candidate.content and candidate.content.parts:
+                        for part in candidate.content.parts:
+                            if hasattr(part, "text"):
+                                generated_text = part.text
+                                break
+                    if generated_text:
+                        break
+
+            if not generated_text:
+                logger.warning(
+                    "No CV text generated. finish_reason=%s, raw response=%s",
+                    response.candidates[0].finish_reason if response.candidates else "unknown",
+                    response
+                )
+                return Response(
+                    {'error': 'No CV generated. Please try again.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            return Response({'cv': generated_text}, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(f"CV generation failed: {e}", exc_info=True)
             return Response({'error': 'Failed to generate CV.'},
@@ -101,7 +147,7 @@ class GenerateCVView(APIView):
 
 
 @method_decorator(
-    ratelimit(key='ip', rate='1/m', method='POST', block=True),
+    ratelimit(key='ip', rate='3/m', method='POST', block=True),
     name='post'
 )
 @extend_schema(
@@ -124,19 +170,38 @@ class AdaptCoverLetterView(APIView):
         base_letter = serializer.validated_data.get('coverLetter')
         job_description = serializer.validated_data.get('job_description')
 
+        # Build a clearer, structured input for the AI
+        structured_input = (
+            f"Base Cover Letter:\n{base_letter}\n\n"
+            f"Job Description:\n{job_description}\n"
+        )
+
         prompt = (
             "You are a helpful assistant that adapts a cover letter to match a job description.\n"
-            "Given the base cover letter and the job description below, produce a tailored cover letter.\n\n"
-            f"Base Cover Letter:\n{base_letter}\n\n"
-            f"Job Description:\n{job_description}\n\n"
+            "Use the structured input below to produce a tailored cover letter.\n"
+            f"---\n{structured_input}---\n"
             "Rewrite the cover letter emphasizing relevant skills and experience matching the job. "
-            "Keep it professional and concise."
+            "Keep it professional, concise, and do not include extra text."
         )
 
         try:
             model = genai.GenerativeModel('gemini-2.5-pro')
-            response = model.generate_content(prompt)
-            return Response({'cover_letter': response.text}, status=status.HTTP_200_OK)
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=5000,
+                )
+            )
+
+            if not response.candidates or not response.candidates[0].content.parts:
+                logger.warning("No cover letter generated. finish_reason=%s",
+                               response.candidates[0].finish_reason if response.candidates else "unknown")
+                return Response({'error': 'No cover letter generated. Please try again.'},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            generated_text = response.candidates[0].content.parts[0].text
+            return Response({'cover_letter': generated_text}, status=status.HTTP_200_OK)
+
         except Exception as e:
             logger.error(f"Cover letter adaptation failed: {e}", exc_info=True)
             return Response({'error': 'Failed to adapt cover letter.'},
