@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 
 import google.generativeai as genai
 from django.utils.decorators import method_decorator
@@ -14,6 +15,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
@@ -58,7 +60,7 @@ def handle_serializer_validation(serializer, logger, view_name):
 
 
 @method_decorator(
-    ratelimit(key='ip', rate='3/m', method='POST', block=True),
+    ratelimit(key='ip', rate='6/m', method='POST', block=True),
     name='post'
 )
 @extend_schema(
@@ -96,70 +98,90 @@ class GenerateCVView(APIView):
         for edu in profile_data.get('education', []):
             profile_str += f"- {edu.get('degree')} at {edu.get('institution')} ({edu.get('year')})\n"
 
-        prompt = (
-            "You are a professional CV writer.\n"
-            "Using the structured profile data below, generate a complete CV in Markdown format.\n"
-            "The CV must always include the sections: Contact, Summary, Experience, Skills, and Education.\n"
-            "If some information is missing, make reasonable assumptions.\n"
-            "Do not leave the CV empty, and do not include explanations outside the CV.\n"
-            f"---\n{profile_str}\n---\n"
-        )
+        prompt = f"""
+        You are a professional CV writer.
+
+        Using the structured profile data below, generate a complete CV in Markdown format.
+
+        The CV must always include sections: Contact, Summary, Experience, Skills, and Education.
+        If some information is missing, make reasonable assumptions.
+        Do not leave the CV empty.
+
+        Profile Data:
+        {profile_str}
+        """
 
         try:
-            model = genai.GenerativeModel('gemini-2.5-pro')
+            model = genai.GenerativeModel('gemini-2.5-flash')
             response = model.generate_content(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=5000,
-                )
+                    max_output_tokens=2000,
+                ),
+                safety_settings=[
+                    {"category": HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
+                    {"category": HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": HarmBlockThreshold.BLOCK_NONE},
+                    {"category": HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                     "threshold": HarmBlockThreshold.BLOCK_NONE},
+                    {"category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                     "threshold": HarmBlockThreshold.BLOCK_NONE},
+                ]
             )
 
-            # Try the quick accessor first
-            generated_text = getattr(response, "text", None)
+            # Log raw response for debugging
+            logger.debug("Raw Gemini response: %s", response)
 
-            # Fallback to candidates->parts if .text is empty
+            generated_text = None
+
+            # First try response.text (safe access)
+            try:
+                generated_text = response.text
+            except Exception as e:
+                logger.warning("response.text accessor failed: %s", e)
+
+            # Fallback: candidates -> parts
             if not generated_text and response.candidates:
                 for candidate in response.candidates:
                     if candidate.content and candidate.content.parts:
                         for part in candidate.content.parts:
-                            if hasattr(part, "text"):
+                            if hasattr(part, "text") and part.text:
                                 generated_text = part.text
                                 break
                     if generated_text:
                         break
 
             if not generated_text:
-                logger.warning(
-                    "No CV text generated. finish_reason=%s, raw response=%s",
-                    response.candidates[0].finish_reason if response.candidates else "unknown",
-                    response
-                )
-                return Response(
-                    {'error': 'No CV generated. Please try again.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+                logger.error("No text in response. finish_reason=%s, full response=%s",
+                             response.candidates[0].finish_reason if response.candidates else "unknown",
+                             response)
+                return Response({'error': 'No CV generated. Please try again.'},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             return Response({'cv': generated_text}, status=status.HTTP_200_OK)
+
         except Exception as e:
-            logger.error(f"CV generation failed: {e}", exc_info=True)
-            return Response({'error': 'Failed to generate CV.'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"CV generation failed with unexpected error: {e}", exc_info=True)
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @method_decorator(
-    ratelimit(key='ip', rate='3/m', method='POST', block=True),
+    ratelimit(key='ip', rate='6/m', method='POST', block=True),
     name='post'
 )
 @extend_schema(
     tags=["AI"],
     request=CoverLetterSerializer,
-    responses={200: OpenApiResponse(description="Adapted Cover Letter", response=CoverLetterSerializer),
-               400: OpenApiResponse(description="Validation Error"),
-               500: OpenApiResponse(description="Server Error")},
+    responses={
+        200: OpenApiResponse(description="Adapted Cover Letter", response=CoverLetterSerializer),
+        400: OpenApiResponse(description="Validation Error"),
+        500: OpenApiResponse(description="Server Error")
+    },
 )
 class AdaptCoverLetterView(APIView):
     permission_classes = [AllowAny]
     parser_classes = [JSONParser]
+
+    MAX_RETRIES = 3
 
     def post(self, request) -> Response:
         serializer = CoverLetterSerializer(data=request.data)
@@ -167,10 +189,15 @@ class AdaptCoverLetterView(APIView):
         if validation_response:
             return validation_response
 
-        base_letter = serializer.validated_data.get('coverLetter')
-        job_description = serializer.validated_data.get('job_description')
+        base_letter = serializer.validated_data.get('coverLetter', '').strip()
+        job_description = serializer.validated_data.get('job_description', '').strip()
 
-        # Build a clearer, structured input for the AI
+        if not base_letter or not job_description:
+            return Response(
+                {'error': 'Cover letter and job description are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         structured_input = (
             f"Base Cover Letter:\n{base_letter}\n\n"
             f"Job Description:\n{job_description}\n"
@@ -185,27 +212,34 @@ class AdaptCoverLetterView(APIView):
         )
 
         try:
-            model = genai.GenerativeModel('gemini-2.5-pro')
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=5000,
+            model = genai.GenerativeModel('gemini-2.5-flash')
+
+            for attempt in range(self.MAX_RETRIES):
+                logger.debug("Sending prompt to AI (attempt %d): %s", attempt + 1, prompt)
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(max_output_tokens=2000)
                 )
+
+                if response.candidates and response.candidates[0].content.parts:
+                    generated_text = response.candidates[0].content.parts[0].text
+                    return Response({'cover_letter': generated_text}, status=status.HTTP_200_OK)
+
+                logger.warning(
+                    "No content returned from AI (attempt %d). finish_reason=%s",
+                    attempt + 1,
+                    response.candidates[0].finish_reason if response.candidates else "unknown"
+                )
+                time.sleep(1)  # small delay before retry
+
+            return Response(
+                {'error': 'No cover letter generated after multiple attempts. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-            if not response.candidates or not response.candidates[0].content.parts:
-                logger.warning("No cover letter generated. finish_reason=%s",
-                               response.candidates[0].finish_reason if response.candidates else "unknown")
-                return Response({'error': 'No cover letter generated. Please try again.'},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            generated_text = response.candidates[0].content.parts[0].text
-            return Response({'cover_letter': generated_text}, status=status.HTTP_200_OK)
-
         except Exception as e:
-            logger.error(f"Cover letter adaptation failed: {e}", exc_info=True)
-            return Response({'error': 'Failed to adapt cover letter.'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error("Cover letter adaptation failed: %s", e, exc_info=True)
+            return Response({'error': 'Failed to adapt cover letter.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @extend_schema(
