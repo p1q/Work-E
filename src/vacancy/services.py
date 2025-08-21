@@ -12,35 +12,35 @@ logger = logging.getLogger(__name__)
 def get_filtered_vacancies(user_cv: CV):
     try:
         if not hasattr(user_cv, 'skills') or not user_cv.skills:
-            logger.info(f"CV {user_cv.id} требует анализа ИИ.")
+            logger.info(f"Резюме {user_cv.id} потребує аналізу ШІ.")
 
             try:
                 extracted_text, method_used, extracted_cv_id, filename = extract_text_from_cv(user_cv)
                 if not extracted_text:
-                     logger.error(f"Не удалось извлечь текст из CV {user_cv.id}.")
+                     logger.error(f"Не вдалося видобути текст із резюме {user_cv.id}.")
                      return Vacancy.objects.none()
-                logger.debug(f"Текст извлечен методом '{method_used}' из CV {extracted_cv_id} ({filename}).")
+                logger.debug(f"Текст видобуто методом '{method_used}' із резюме {extracted_cv_id} ({filename}).")
             except ValidationError as e:
-                 logger.error(f"Ошибка извлечения текста из CV {user_cv.id}: {e}")
+                 logger.error(f"Помилка видобування тексту з резюме {user_cv.id}: {e}")
                  return Vacancy.objects.none()
             except Exception as e:
-                 logger.error(f"Неожиданная ошибка при извлечении текста из CV {user_cv.id}: {e}", exc_info=True)
+                 logger.error(f"Неочікувана помилка під час видобування тексту з резюме {user_cv.id}: {e}", exc_info=True)
                  return Vacancy.objects.none()
 
             try:
                 ai_extracted_data = analyze_cv_with_ai(user_cv.id, user_cv.user.id if user_cv.user else None, cv_text_override=extracted_text)
                 if not ai_extracted_data:
-                    logger.error(f"ИИ не вернул данные для CV {user_cv.id}.")
+                    logger.error(f"ШІ не повернув дані для резюме {user_cv.id}.")
                     return Vacancy.objects.none()
-                logger.debug(f"Данные от ИИ получены для CV {user_cv.id}.")
+                logger.debug(f"Дані від ШІ отримано для резюме {user_cv.id}.")
             except Exception as e:
-                 logger.error(f"Ошибка анализа ИИ CV {user_cv.id}: {e}", exc_info=True)
+                 logger.error(f"Помилка аналізу ШІ резюме {user_cv.id}: {e}", exc_info=True)
                  return Vacancy.objects.none()
 
             cv_data_for_filtering = ai_extracted_data
 
         else:
-            logger.info(f"CV {user_cv.id} уже содержит данные ИИ или не требует анализа.")
+            logger.info(f"Резюме {user_cv.id} вже містить дані ШІ або не потребує аналізу.")
             cv_data_for_filtering = {
                 "skills": getattr(user_cv, 'skills', []),
                 "tools": getattr(user_cv, 'tools', []),
@@ -57,7 +57,7 @@ def get_filtered_vacancies(user_cv: CV):
             }
 
     except Exception as e:
-        logger.error(f"Ошибка подготовки данных CV {user_cv.id} для фильтрации: {e}", exc_info=True)
+        logger.error(f"Помилка підготовки даних резюме {user_cv.id} для фільтрації: {e}", exc_info=True)
         return Vacancy.objects.none()
 
 
@@ -117,9 +117,9 @@ def get_filtered_vacancies(user_cv: CV):
                  filters &= Q(salary_min__lte=upper_bound, salary_max__gte=lower_bound)
 
         vacancies = Vacancy.objects.filter(filters)
-        logger.info(f"Найдено {vacancies.count()} вакансий для CV {user_cv.id} после фильтрации.")
+        logger.info(f"Знайдено {vacancies.count()} вакансій для резюме {user_cv.id} після фільтрації.")
         return vacancies
 
     except Exception as e:
-         logger.error(f"Ошибка фильтрации вакансий для CV {user_cv.id}: {e}", exc_info=True)
+         logger.error(f"Помилка фільтрації вакансій для резюме {user_cv.id}: {e}", exc_info=True)
          return Vacancy.objects.none()
