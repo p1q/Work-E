@@ -1,104 +1,125 @@
+import logging
+
+from cvs.models import CV
+from cvs.service import analyze_cv_with_ai, extract_text_from_cv
+from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .models import Vacancy
-from decimal import Decimal
+from vacancy.models import Vacancy
 
-LANGUAGE_LEVELS = {
-    'A1': 1,
-    'A2': 2,
-    'B1': 3,
-    'B2': 4,
-    'C1': 5,
-    'C2': 6
-}
-
-def convert_to_usd(amount, currency):
-    if not amount or not currency:
-        return None
-
-    if currency == 'USD':
-        return Decimal(amount)
-    elif currency == 'EUR':
-        return Decimal(amount) * Decimal('1.07')
-    elif currency == 'UAH':
-        return Decimal(amount) / Decimal('36.9')
-    return None
+logger = logging.getLogger(__name__)
 
 
-def get_filtered_vacancies(user_cv):
-    filters = Q()
+def get_filtered_vacancies(user_cv: CV):
+    try:
+        if not hasattr(user_cv, 'skills') or not user_cv.skills:
+            logger.info(f"CV {user_cv.id} требует анализа ИИ.")
 
-    # 1. Фильтрация по языкам
-    if hasattr(user_cv, 'languages') and user_cv.languages:
+            try:
+                extracted_text, method_used, extracted_cv_id, filename = extract_text_from_cv(user_cv)
+                if not extracted_text:
+                     logger.error(f"Не удалось извлечь текст из CV {user_cv.id}.")
+                     return Vacancy.objects.none()
+                logger.debug(f"Текст извлечен методом '{method_used}' из CV {extracted_cv_id} ({filename}).")
+            except ValidationError as e:
+                 logger.error(f"Ошибка извлечения текста из CV {user_cv.id}: {e}")
+                 return Vacancy.objects.none()
+            except Exception as e:
+                 logger.error(f"Неожиданная ошибка при извлечении текста из CV {user_cv.id}: {e}", exc_info=True)
+                 return Vacancy.objects.none()
+
+            try:
+                ai_extracted_data = analyze_cv_with_ai(user_cv.id, user_cv.user.id if user_cv.user else None, cv_text_override=extracted_text)
+                if not ai_extracted_data:
+                    logger.error(f"ИИ не вернул данные для CV {user_cv.id}.")
+                    return Vacancy.objects.none()
+                logger.debug(f"Данные от ИИ получены для CV {user_cv.id}.")
+            except Exception as e:
+                 logger.error(f"Ошибка анализа ИИ CV {user_cv.id}: {e}", exc_info=True)
+                 return Vacancy.objects.none()
+
+            cv_data_for_filtering = ai_extracted_data
+
+        else:
+            logger.info(f"CV {user_cv.id} уже содержит данные ИИ или не требует анализа.")
+            cv_data_for_filtering = {
+                "skills": getattr(user_cv, 'skills', []),
+                "tools": getattr(user_cv, 'tools', []),
+                "responsibilities": getattr(user_cv, 'responsibilities', []),
+                "languages": getattr(user_cv, 'languages', []),
+                 "level": getattr(user_cv, 'level', None),
+                 "cities": getattr(user_cv, 'cities', []),
+                 "countries": getattr(user_cv, 'countries', []),
+                 "is_remote": getattr(user_cv, 'is_remote', None),
+                 "willing_to_relocate": getattr(user_cv, 'willing_to_relocate', False),
+                 "salary_min": getattr(user_cv, 'salary_min', None),
+                 "salary_max": getattr(user_cv, 'salary_max', None),
+                 "salary_currency": getattr(user_cv, 'salary_currency', None),
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка подготовки данных CV {user_cv.id} для фильтрации: {e}", exc_info=True)
+        return Vacancy.objects.none()
+
+
+    try:
+        filters = Q()
+
         language_filter = Q()
-        for cv_lang in user_cv.languages:
-            cv_lang_name = cv_lang.get("language")
-            cv_lang_level = cv_lang.get("level")
+        cv_languages = cv_data_for_filtering.get("languages", [])
+        for lang_info in cv_languages:
+             cv_lang_name = lang_info.get('language')
+             cv_level_value = lang_info.get('level')
+             if cv_lang_name and cv_level_value:
+                 language_filter |= Q(languages__contains=[{"language": cv_lang_name, "level": cv_level_value}])
 
-            if not cv_lang_name or not cv_lang_level:
-                continue
-
-            if cv_lang_level in LANGUAGE_LEVELS:
-                cv_level_value = LANGUAGE_LEVELS[cv_lang_level]
-
-                # Фильтрация вакансий по языкам и уровням
-                language_filter |= Q(languages__language=cv_lang_name,
-                                     languages__level__gte=cv_level_value - 1)
         if language_filter:
             filters &= language_filter
 
-    # 2. Фильтрация по уровню
-    if hasattr(user_cv, 'level') and user_cv.level:
-        filters &= Q(level=user_cv.level)
+        cv_level = cv_data_for_filtering.get("level")
+        if cv_level:
+            filters &= Q(level=cv_level)
 
-    # 3. Фильтрация по категориям
-    if hasattr(user_cv, 'categories') and user_cv.categories:
-        primary_category = user_cv.categories[0] if len(user_cv.categories) > 0 else None
-        if primary_category:
-            filters &= Q(categories__contains=[primary_category])
+        location_filter = Q()
+        is_remote_preference = cv_data_for_filtering.get("is_remote")
+        willing_to_relocate = cv_data_for_filtering.get("willing_to_relocate", False)
+        cities = cv_data_for_filtering.get("cities", [])
+        countries = cv_data_for_filtering.get("countries", [])
 
-    # 4. Фильтрация по локации
-    location_filter = Q()
+        if is_remote_preference is True:
+            location_filter |= Q(is_remote=True)
 
-    # Учитываем отдалённую работу
-    if getattr(user_cv, 'is_remote', True) != False:
-        location_filter |= Q(is_remote=True)
+        if willing_to_relocate:
+            pass
+        else:
+            if cities:
+                location_filter |= Q(cities__overlap=cities)
+            if countries:
+                location_filter |= Q(countries__overlap=countries)
+            if is_remote_preference is False:
+                 location_filter &= ~Q(is_remote=True)
 
-    if getattr(user_cv, 'willing_to_relocate', False):
-        # Нет дополнительных ограничений для релокации
-        pass
-    else:
-        if getattr(user_cv, 'cities', None):
-            location_filter |= Q(cities__overlap=user_cv.cities)
-        if getattr(user_cv, 'countries', None):
-            location_filter |= Q(countries__overlap=user_cv.countries)
+        if location_filter:
+            filters &= location_filter
 
-    # Исключаем отдалённые вакансии, если пользователь явно не хочет работать удалённо
-    if getattr(user_cv, 'is_remote', None) is False:
-        location_filter &= ~Q(is_remote=True)
+        salary_min = cv_data_for_filtering.get("salary_min")
+        salary_max = cv_data_for_filtering.get("salary_max")
+        salary_currency = cv_data_for_filtering.get("salary_currency")
 
-    # Добавляем гибридные вакансии, если пользователь готов работать в офисе
-    if getattr(user_cv, 'is_office', None) is True and getattr(user_cv, 'cities', None):
-        location_filter |= Q(is_hybrid=True, cities__overlap=user_cv.cities)
+        if salary_min is not None and salary_max is not None and salary_currency:
+             def convert_to_usd(amount, currency):
+                 return amount
+             cv_min_usd = convert_to_usd(salary_min, salary_currency)
+             cv_max_usd = convert_to_usd(salary_max, salary_currency)
+             if cv_min_usd is not None and cv_max_usd is not None:
+                 tolerance = 0.20
+                 lower_bound = cv_min_usd * (1 - tolerance)
+                 upper_bound = cv_max_usd * (1 + tolerance)
+                 filters &= Q(salary_min__lte=upper_bound, salary_max__gte=lower_bound)
 
-    if location_filter:
-        filters &= location_filter
+        vacancies = Vacancy.objects.filter(filters)
+        logger.info(f"Найдено {vacancies.count()} вакансий для CV {user_cv.id} после фильтрации.")
+        return vacancies
 
-    # 5. Фильтрация по зарплате
-    if (hasattr(user_cv, 'salary_min') and hasattr(user_cv, 'salary_max') and
-            hasattr(user_cv, 'salary_currency') and
-            user_cv.salary_min is not None and user_cv.salary_max is not None and user_cv.salary_currency):
-
-        cv_min_usd = convert_to_usd(user_cv.salary_min, user_cv.salary_currency)
-        cv_max_usd = convert_to_usd(user_cv.salary_max, user_cv.salary_currency)
-
-        if cv_min_usd is not None and cv_max_usd is not None:
-            tolerance = Decimal('0.20')
-            lower_bound = cv_min_usd * (1 - tolerance)
-            upper_bound = cv_max_usd * (1 + tolerance)
-
-            filters &= Q(salary_min__lte=upper_bound, salary_max__gte=lower_bound)
-
-    # Выполняем запрос с фильтрацией
-    vacancies = Vacancy.objects.filter(filters)
-
-    return vacancies
+    except Exception as e:
+         logger.error(f"Ошибка фильтрации вакансий для CV {user_cv.id}: {e}", exc_info=True)
+         return Vacancy.objects.none()
