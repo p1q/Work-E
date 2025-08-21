@@ -1,11 +1,11 @@
-import logging
-from django.contrib.auth import get_user_model
-from cvs.models import CV
-from vacancy.models import Vacancy
-from src.openapi.prompts import VACANCY_ANALYSIS_PROMPT
-from src.openapi.service import call_openapi_ai
-from src.vacancy.services import get_filtered_vacancies
 import json
+import logging
+
+from cvs.models import CV
+from django.contrib.auth import get_user_model
+from vacancy.models import Vacancy
+
+from src.openapi.service import call_openapi_ai
 
 logger = logging.getLogger(__name__)
 
@@ -19,35 +19,6 @@ WEIGHTS = {
     'location': 0.15,
     'salary': 0.10,
 }
-
-
-def extract_vacancy_data(description_text: str) -> dict:
-    logger.info("Sending vacancy text to OpenAPI AI for data extraction.")
-    prompt = VACANCY_ANALYSIS_PROMPT.format(vacancy_text=description_text)
-    messages = [{"role": "user", "content": prompt}]
-    raw_response = call_openapi_ai(messages=messages, temperature=0.1)
-
-    if not raw_response or 'choices' not in raw_response or not raw_response['choices']:
-        logger.error("Empty or invalid response from OpenAPI AI for vacancy analysis.")
-        return {}
-
-    content = raw_response['choices'][0]['message']['content']
-
-    try:
-        # Видаляємо зайві символи, якщо вони є
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.endswith("```"):
-            content = content[:-3]
-
-        return json.loads(content)
-    except json.JSONDecodeError as e:
-        logger.error(
-            f"Error decoding JSON from OpenAPI AI response content for vacancy: {e}. Raw content snippet: {content[:200] if content else 'N/A'}")
-        return {}
-    except Exception as e:
-        logger.error(f"Unexpected error processing OpenAPI AI response for vacancy: {e}", exc_info=True)
-        return {}
 
 
 def calculate_match_percentage(cv_data: dict, vacancy_data: dict, vacancy: Vacancy, user_cv: CV) -> dict:
@@ -219,112 +190,3 @@ def calculate_match_percentage(cv_data: dict, vacancy_data: dict, vacancy: Vacan
         'salary_match': round(salary_match, 2),
         'score': round(weighted_score, 2)
     }
-
-
-def analyze_cv(user_id: int) -> list:
-    """Аналіз CV користувача та пошук відповідних вакансій"""
-    logger.info(f"Starting CV analysis for user {user_id}")
-
-    # 1. Отримуємо користувача
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        logger.error(f"User with ID {user_id} not found")
-        raise Exception(f"Користувача з ID {user_id} не знайдено")
-
-    # 2. Отримуємо останнє CV користувача
-    try:
-        user_cv = CV.objects.filter(user=user).latest('uploaded_at')
-    except CV.DoesNotExist:
-        logger.error(f"CV for user {user_id} not found")
-        raise Exception(f"Резюме для користувача {user_id} не знайдено")
-
-    # 3. Використовуємо фільтровані вакансії
-    vacancies = get_filtered_vacancies(user_cv)
-
-    if not vacancies.exists():
-        logger.info(f"No vacancies found for user {user_id}")
-        return []
-
-    # 4. Аналізуємо CV через ШІ
-    cv_text = getattr(user_cv, 'text', None)
-    if not cv_text:
-        logger.warning(f"No text found in CV {user_cv.id} for user {user_id}")
-        raise Exception("Не вдалося отримати текст резюме")
-
-    cv_data = extract_cv_data(cv_text)
-    if not cv_data:
-        logger.error(f"Failed to extract data from CV {user_cv.id} for user {user_id}")
-        raise Exception("Не вдалося проаналізувати резюме")
-
-    matches = []
-
-    # 5. Аналізуємо кожну вакансію
-    for vacancy in vacancies:
-        try:
-            # Аналізуємо опис вакансії через ШІ
-            vacancy_data = extract_vacancy_data(vacancy.description)
-            if not vacancy_data:
-                logger.warning(f"Failed to extract data from vacancy {vacancy.id}")
-                continue
-
-            # Розраховуємо співпадіння
-            match_percentages = calculate_match_percentage(cv_data, vacancy_data, vacancy, user_cv)
-
-            match = {
-                'vacancy_id': vacancy.id,
-                'title': vacancy.title,
-                'link': vacancy.link,
-                'score': match_percentages['score'],
-                'match_quality': 'High' if match_percentages['score'] >= 80 else (
-                    'Medium' if match_percentages['score'] >= 50 else 'Low'),
-                'skills_match': match_percentages['skills_match'],
-                'tools_match': match_percentages['tools_match'],
-                'responsibilities_match': match_percentages['responsibilities_match'],
-                'languages_match': match_percentages['languages_match'],
-                'location_match': match_percentages['location_match'],
-                'salary_match': match_percentages['salary_match']
-            }
-
-            matches.append(match)
-
-        except Exception as e:
-            logger.error(f"Error processing vacancy {vacancy.id}: {e}", exc_info=True)
-            continue
-
-    # Сортуємо за спаданням відсотка співпадіння
-    matches.sort(key=lambda x: x['score'], reverse=True)
-
-    logger.info(f"Completed CV analysis for user {user_id}. Found {len(matches)} matches.")
-    return matches
-
-
-def extract_cv_data(cv_text: str) -> dict:
-    """Витягує структуровані дані з тексту CV через ШІ"""
-    from src.openapi.prompts import CV_ANALYSIS_PROMPT
-
-    prompt = CV_ANALYSIS_PROMPT.format(cv_text=cv_text)
-    messages = [{"role": "user", "content": prompt}]
-    raw_response = call_openapi_ai(messages=messages, temperature=0.1)
-
-    if not raw_response or 'choices' not in raw_response or not raw_response['choices']:
-        logger.error("Empty or invalid response from OpenAPI AI for CV analysis.")
-        return {}
-
-    content = raw_response['choices'][0]['message']['content']
-
-    try:
-        # Видаляємо зайві символи, якщо вони є
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.endswith("```"):
-            content = content[:-3]
-
-        return json.loads(content)
-    except json.JSONDecodeError as e:
-        logger.error(
-            f"Error decoding JSON from OpenAPI AI response content for CV: {e}. Raw content snippet: {content[:200] if content else 'N/A'}")
-        return {}
-    except Exception as e:
-        logger.error(f"Unexpected error processing OpenAPI AI response for CV: {e}", exc_info=True)
-        return {}
