@@ -1,10 +1,8 @@
 import logging
 
-from django.db.models import Q
-
-from vacancy.models import Vacancy
-
 from cvs.models import CV
+from django.db.models import Q
+from vacancy.models import Vacancy
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +24,6 @@ def get_filtered_vacancies(user_cv: CV):
             "salary_max": user_cv.salary_max,
             "salary_currency": user_cv.salary_currency,
         }
-
-        # --- 2. Фільтрація вакансій ---
 
         # --- ФІЛЬТР 1: Категорії ---
         filters = Q()
@@ -64,7 +60,7 @@ def get_filtered_vacancies(user_cv: CV):
 
         if is_remote_needed:
             location_filter |= Q(is_remote=True)
-        if willing_to_relocate is not False:  # True або None
+        if willing_to_relocate is not False:
             if cities:
                 location_filter |= Q(cities__overlap=cities)
             if countries:
@@ -75,7 +71,7 @@ def get_filtered_vacancies(user_cv: CV):
 
         vacancies = Vacancy.objects.filter(filters)
 
-        # --- ФІЛЬТР 5: Зарплата (додатковий, після основних) ---
+        # --- ФІЛЬТР 5: Зарплата ---
         salary_min = cv_data_for_filtering.get("salary_min")
         salary_max = cv_data_for_filtering.get("salary_max")
         salary_currency = cv_data_for_filtering.get("salary_currency")
