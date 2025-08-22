@@ -1,11 +1,8 @@
-import json
 import logging
 
 from cvs.models import CV
 from django.contrib.auth import get_user_model
 from vacancy.models import Vacancy
-
-from src.openapi.service import call_openapi_ai
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +19,6 @@ WEIGHTS = {
 
 
 def calculate_match_percentage(cv_data: dict, vacancy_data: dict, vacancy: Vacancy, user_cv: CV) -> dict:
-    """Розраховує відсоток співпадіння між CV та вакансією"""
-
     def calculate_skills_match(cv_skills, vacancy_skills):
         if not vacancy_skills:
             return 100.0
