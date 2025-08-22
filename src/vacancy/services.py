@@ -1,125 +1,100 @@
 import logging
 
-from cvs.models import CV
-from cvs.service import analyze_cv_with_ai, extract_text_from_cv
-from django.core.exceptions import ValidationError
 from django.db.models import Q
+
 from vacancy.models import Vacancy
+
+from cvs.models import CV
 
 logger = logging.getLogger(__name__)
 
 
 def get_filtered_vacancies(user_cv: CV):
     try:
-        if not hasattr(user_cv, 'skills') or not user_cv.skills:
-            logger.info(f"Резюме {user_cv.id} потребує аналізу ШІ.")
+        cv_data_for_filtering = {
+            "skills": user_cv.skills or [],
+            "languages": user_cv.languages or [],
+            "level": user_cv.level,
+            "categories": user_cv.categories or [],
+            "countries": user_cv.countries or [],
+            "cities": user_cv.cities or [],
+            "is_office": user_cv.is_office,
+            "is_remote": user_cv.is_remote,
+            "is_hybrid": user_cv.is_hybrid,
+            "willing_to_relocate": user_cv.willing_to_relocate,
+            "salary_min": user_cv.salary_min,
+            "salary_max": user_cv.salary_max,
+            "salary_currency": user_cv.salary_currency,
+        }
 
-            try:
-                extracted_text, method_used, extracted_cv_id, filename = extract_text_from_cv(user_cv)
-                if not extracted_text:
-                     logger.error(f"Не вдалося видобути текст із резюме {user_cv.id}.")
-                     return Vacancy.objects.none()
-                logger.debug(f"Текст видобуто методом '{method_used}' із резюме {extracted_cv_id} ({filename}).")
-            except ValidationError as e:
-                 logger.error(f"Помилка видобування тексту з резюме {user_cv.id}: {e}")
-                 return Vacancy.objects.none()
-            except Exception as e:
-                 logger.error(f"Неочікувана помилка під час видобування тексту з резюме {user_cv.id}: {e}", exc_info=True)
-                 return Vacancy.objects.none()
+        # --- 2. Фільтрація вакансій ---
 
-            try:
-                ai_extracted_data = analyze_cv_with_ai(user_cv.id, user_cv.user.id if user_cv.user else None, cv_text_override=extracted_text)
-                if not ai_extracted_data:
-                    logger.error(f"ШІ не повернув дані для резюме {user_cv.id}.")
-                    return Vacancy.objects.none()
-                logger.debug(f"Дані від ШІ отримано для резюме {user_cv.id}.")
-            except Exception as e:
-                 logger.error(f"Помилка аналізу ШІ резюме {user_cv.id}: {e}", exc_info=True)
-                 return Vacancy.objects.none()
-
-            cv_data_for_filtering = ai_extracted_data
-
-        else:
-            logger.info(f"Резюме {user_cv.id} вже містить дані ШІ або не потребує аналізу.")
-            cv_data_for_filtering = {
-                "skills": getattr(user_cv, 'skills', []),
-                "tools": getattr(user_cv, 'tools', []),
-                "responsibilities": getattr(user_cv, 'responsibilities', []),
-                "languages": getattr(user_cv, 'languages', []),
-                 "level": getattr(user_cv, 'level', None),
-                 "cities": getattr(user_cv, 'cities', []),
-                 "countries": getattr(user_cv, 'countries', []),
-                 "is_remote": getattr(user_cv, 'is_remote', None),
-                 "willing_to_relocate": getattr(user_cv, 'willing_to_relocate', False),
-                 "salary_min": getattr(user_cv, 'salary_min', None),
-                 "salary_max": getattr(user_cv, 'salary_max', None),
-                 "salary_currency": getattr(user_cv, 'salary_currency', None),
-            }
-
-    except Exception as e:
-        logger.error(f"Помилка підготовки даних резюме {user_cv.id} для фільтрації: {e}", exc_info=True)
-        return Vacancy.objects.none()
-
-
-    try:
+        # --- ФІЛЬТР 1: Категорії ---
         filters = Q()
-
-        language_filter = Q()
-        cv_languages = cv_data_for_filtering.get("languages", [])
-        for lang_info in cv_languages:
-             cv_lang_name = lang_info.get('language')
-             cv_level_value = lang_info.get('level')
-             if cv_lang_name and cv_level_value:
-                 language_filter |= Q(languages__contains=[{"language": cv_lang_name, "level": cv_level_value}])
-
-        if language_filter:
-            filters &= language_filter
-
-        cv_level = cv_data_for_filtering.get("level")
-        if cv_level:
-            filters &= Q(level=cv_level)
-
-        location_filter = Q()
-        is_remote_preference = cv_data_for_filtering.get("is_remote")
-        willing_to_relocate = cv_data_for_filtering.get("willing_to_relocate", False)
-        cities = cv_data_for_filtering.get("cities", [])
-        countries = cv_data_for_filtering.get("countries", [])
-
-        if is_remote_preference is True:
-            location_filter |= Q(is_remote=True)
-
-        if willing_to_relocate:
-            pass
+        if cv_data_for_filtering.get("categories"):
+            filters &= Q(categories__overlap=cv_data_for_filtering["categories"])
         else:
+            logger.info("У резюме не вказано категорій. Повернено порожній список.")
+            return Vacancy.objects.none()
+
+        # --- ФІЛЬТР 2: Мови ---
+        if cv_data_for_filtering.get("languages"):
+            languages_filter = Q()
+            for lang_data in cv_data_for_filtering["languages"]:
+                lang = lang_data.get("language")
+                level = lang_data.get("level")
+                if lang:
+                    if level:
+                        languages_filter |= Q(languages__contains=[{"language": lang, "level": level}])
+                    else:
+                        languages_filter |= Q(languages__contains=[{"language": lang}])
+            if languages_filter:
+                filters &= languages_filter
+
+        # --- ФІЛЬТР 3: Рівень досвіду ---
+        if cv_data_for_filtering.get("level"):
+            filters &= Q(level=cv_data_for_filtering["level"])
+
+        # --- ФІЛЬТР 4: Локація ---
+        location_filter = Q()
+        is_remote_needed = cv_data_for_filtering.get("is_remote")
+        willing_to_relocate = cv_data_for_filtering.get("willing_to_relocate")
+        cities = cv_data_for_filtering.get("cities")
+        countries = cv_data_for_filtering.get("countries")
+
+        if is_remote_needed:
+            location_filter |= Q(is_remote=True)
+        if willing_to_relocate is not False:  # True або None
             if cities:
                 location_filter |= Q(cities__overlap=cities)
             if countries:
                 location_filter |= Q(countries__overlap=countries)
-            if is_remote_preference is False:
-                 location_filter &= ~Q(is_remote=True)
 
         if location_filter:
             filters &= location_filter
 
+        vacancies = Vacancy.objects.filter(filters)
+
+        # --- ФІЛЬТР 5: Зарплата (додатковий, після основних) ---
         salary_min = cv_data_for_filtering.get("salary_min")
         salary_max = cv_data_for_filtering.get("salary_max")
         salary_currency = cv_data_for_filtering.get("salary_currency")
 
-        if salary_min is not None and salary_max is not None and salary_currency:
-             def convert_to_usd(amount, currency):
-                 return amount
-             cv_min_usd = convert_to_usd(salary_min, salary_currency)
-             cv_max_usd = convert_to_usd(salary_max, salary_currency)
-             if cv_min_usd is not None and cv_max_usd is not None:
-                 tolerance = 0.20
-                 lower_bound = cv_min_usd * (1 - tolerance)
-                 upper_bound = cv_max_usd * (1 + tolerance)
-                 filters &= Q(salary_min__lte=upper_bound, salary_max__gte=lower_bound)
+        salary_filter = Q()
+        if salary_min is not None:
+            salary_filter &= Q(salary_max__gte=salary_min)
+        if salary_max is not None:
+            salary_filter &= Q(salary_min__lte=salary_max)
+        if salary_currency:
+            salary_filter &= (Q(salary_currency=salary_currency) | Q(salary_currency__isnull=True))
 
-        vacancies = Vacancy.objects.filter(filters)
+        if salary_filter:
+            vacancies = vacancies.filter(salary_filter)
+
         logger.info(f"Знайдено {vacancies.count()} вакансій для резюме {user_cv.id} після фільтрації.")
+
         return vacancies
 
     except Exception as e:
-         logger.error(f"Помилка фільтрації вакансій для резюме {user_cv.id}: {e}", exc_info=True)
-         return Vacancy.objects.none()
+        logger.error(f"Помилка фільтрації вакансій для резюме {user_cv.id}: {e}", exc_info=True)
+        return Vacancy.objects.none()
