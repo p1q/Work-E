@@ -47,17 +47,6 @@ class MatchesForUserView(APIView):
         if not user_cv:
             return Response({'error': f'Resumé for user {user_id} not found.'}, status=404)
 
-        cv_data = {
-            'languages': user_cv.languages,
-            'level': user_cv.level,
-            'categories': user_cv.categories,
-            'is_office': user_cv.is_office,
-            'is_remote': user_cv.is_remote,
-            'willing_to_relocate': user_cv.willing_to_relocate,
-            'salary_min': user_cv.salary_min,
-            'salary_max': user_cv.salary_max,
-        }
-
         vacancies = get_filtered_vacancies(user_cv)
 
         matches = []
