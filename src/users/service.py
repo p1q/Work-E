@@ -10,3 +10,8 @@ def fetch_google_userinfo(access_token):
         raise ValueError(f"Google userinfo error: {resp.status_code} {resp.text}")
 
     return resp.json()
+
+def calculate_profile_completion(user):
+    fields = ["first_name", "last_name", "email", "linkedin_id", "google_id", "avatar_url"]
+    filled = sum(1 for field in fields if getattr(user, field))
+    return int(filled / len(fields) * 100)

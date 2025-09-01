@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 
 username_validator = RegexValidator(
     regex=r'^[A-Za-z0-9._-]+$',
@@ -36,3 +37,104 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile"
+    )
+
+    personal_info = models.OneToOneField(
+        "PersonalInfo",
+        on_delete=models.CASCADE,
+        related_name="profile",
+        null=True,
+        blank=True
+    )
+
+    overview = models.TextField(blank=True, null=True)
+    hobbies = models.TextField(blank=True, null=True)
+    motivation_letter = models.TextField(blank=True, null=True)
+    linkedin = models.URLField(max_length=500, blank=True, null=True)
+    github = models.URLField(max_length=500, blank=True, null=True)
+    ip = models.GenericIPAddressField(blank=True, null=True)
+
+    # List fields stored as JSON or related models
+    programming_languages = models.JSONField(default=list, blank=True)  # ["Python", "JS"]
+    skills = models.JSONField(default=list, blank=True)  # ["Django", "React"]
+
+    def __str__(self):
+        return f"Profile of {self.user.username}"
+
+
+class PersonalInfo(models.Model):
+    desired_position = models.CharField(max_length=255, blank=True, null=True)
+    first_name = models.CharField(max_length=100, blank=True, null=True)
+    last_name = models.CharField(max_length=100, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=50, blank=True, null=True)
+    country = models.CharField(max_length=100, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.desired_position})"
+
+
+class Experience(models.Model):
+    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="experiences")
+    position = models.CharField(max_length=255, blank=True, null=True)
+    company = models.CharField(max_length=255, blank=True, null=True)
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.position} at {self.company}"
+
+
+class Education(models.Model):
+    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="education")
+    specialization = models.CharField(max_length=255, blank=True, null=True)
+    institution = models.CharField(max_length=255, blank=True, null=True)
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.specialization} at {self.institution}"
+
+
+class Course(models.Model):
+    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="courses")
+    specialization = models.CharField(max_length=255, blank=True, null=True)
+    institution = models.CharField(max_length=255, blank=True, null=True)
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.specialization} ({self.institution})"
+
+
+class Language(models.Model):
+    profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="foreign_languages")
+
+    BEGINNER = "Beginner"
+    INTERMEDIATE = "Intermediate"
+    ADVANCED = "Advanced"
+    FLUENT = "Fluent"
+    NATIVE = "Native"
+
+    LEVEL_CHOICES = [
+        (BEGINNER, "Beginner"),
+        (INTERMEDIATE, "Intermediate"),
+        (ADVANCED, "Advanced"),
+        (FLUENT, "Fluent"),
+        (NATIVE, "Native"),
+    ]
+
+    name = models.CharField(max_length=100, blank=True, null=True)
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.level})"
