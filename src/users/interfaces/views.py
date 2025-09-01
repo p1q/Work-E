@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.http import JsonResponse
 from drf_spectacular.utils import extend_schema, OpenApiRequest
 from rest_framework import status, generics
 from rest_framework.authtoken.models import Token
@@ -17,7 +18,23 @@ from src.schemas.users import (USER_LIST_RESPONSE, USER_CREATE_REQUEST, USER_DET
                                USER_UPDATE_RESPONSE, USER_DELETE_RESPONSE, REGISTER_REQUEST, REGISTER_RESPONSE_SUCCESS,
                                REGISTER_RESPONSE_ERROR,
                                LOGIN_REQUEST, LOGIN_RESPONSE_SUCCESS, LOGIN_RESPONSE_ERROR, CURRENT_USER_RESPONSE, )
+from src.users.service import calculate_profile_completion
 
+
+def profile(request):
+    user = request.user
+    completion = calculate_profile_completion(user)
+
+    data = {
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "linkedin": user.linkedin_url,
+        "cv": user.cv,
+        "joined": user.date_joined,
+        "completion_percentage": completion,  # <--- added
+    }
+    return JsonResponse(data)
 
 class UserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.all()

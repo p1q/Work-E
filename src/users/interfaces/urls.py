@@ -1,3 +1,5 @@
+from users.interfaces.views import profile
+
 from django.urls import path
 from users.interfaces.views import (
     UserListCreateView,
@@ -24,4 +26,6 @@ urlpatterns = [
     path('linkedin/login/', LinkedInLoginView.as_view(), name='linkedin-login'),
 
     path('logout/', LogoutView.as_view(), name='logout'),
+
+    path('profile/', profile, name='cv-profile'),
 ]
