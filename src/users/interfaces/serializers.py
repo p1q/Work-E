@@ -1,7 +1,7 @@
 import re
 from rest_framework import serializers
 from django.core.validators import RegexValidator
-from users.infrastructure.models import User
+from users.infrastructure.models import User, Experience, Education, Course, Language, PersonalInfo
 
 sql_injection_validator = RegexValidator(
     regex=r'^(?!.*(;|--|\b(drop|insert|delete|update|select)\b)).*$',
@@ -113,3 +113,31 @@ class PatchUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'avatar_url']
+
+
+#               USER PROFILE
+
+class PersonalInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonalInfo
+        fields = "__all__"
+
+class ExperienceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Experience
+        fields = "__all__"
+
+class EducationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Education
+        fields = "__all__"
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = "__all__"
+
+class LanguageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Language
+        fields = "__all__"

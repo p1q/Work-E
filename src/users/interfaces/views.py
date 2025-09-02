@@ -6,6 +6,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import viewsets, permissions
 from users.infrastructure.models import User
 from users.interfaces.serializers import (
     UserSerializer,
@@ -13,6 +14,7 @@ from users.interfaces.serializers import (
     LoginSerializer,
     PatchUserSerializer,
 )
+
 
 from src.schemas.users import (USER_LIST_RESPONSE, USER_CREATE_REQUEST, USER_DETAIL_RESPONSE, USER_UPDATE_REQUEST,
                                USER_UPDATE_RESPONSE, USER_DELETE_RESPONSE, REGISTER_REQUEST, REGISTER_RESPONSE_SUCCESS,
