@@ -64,9 +64,14 @@ class PersonalInfo(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.desired_position})"
 
-
 class Experience(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="experiences")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="experiences",
+        null=True,   # allow NULL for existing rows
+        blank=True
+    )
     position = models.CharField(max_length=255, blank=True, null=True)
     company = models.CharField(max_length=255, blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
@@ -78,7 +83,13 @@ class Experience(models.Model):
 
 
 class Education(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="education")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="education",
+        null=True,
+        blank=True
+    )
     specialization = models.CharField(max_length=255, blank=True, null=True)
     institution = models.CharField(max_length=255, blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
@@ -89,7 +100,13 @@ class Education(models.Model):
 
 
 class Course(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="courses")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="courses",
+        null=True,
+        blank=True
+    )
     specialization = models.CharField(max_length=255, blank=True, null=True)
     institution = models.CharField(max_length=255, blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
@@ -101,7 +118,13 @@ class Course(models.Model):
 
 
 class Language(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="foreign_languages")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="foreign_languages",
+        null=True,
+        blank=True
+    )
 
     BEGINNER = "Beginner"
     INTERMEDIATE = "Intermediate"
