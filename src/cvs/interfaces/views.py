@@ -466,7 +466,7 @@ class GetDownloadLinkView(APIView):
         cache.set(cache_key, file_path, timeout=300)
         logger.info(f"Токен {token} збережено в кеші для файлу: {file_path}")
 
-        download_url = request.build_absolute_uri(f'/api/cvs/download-cv-file/{token}/')
+        download_url = request.build_absolute_uri(f'/api/cvs/download-cv-file/{token}/').replace("http://", "https://")
         logger.info(
             f"Згенеровано одноразове посилання для завантаження CV '{cv.cv_file.name}' для користувача {user_id}. Посилання: {download_url}")
         return Response({'download_url': download_url}, status=status.HTTP_200_OK)
