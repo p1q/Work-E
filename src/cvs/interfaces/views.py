@@ -421,27 +421,53 @@ class GetDownloadLinkView(APIView):
     @extend_schema(
         tags=["CVs"],
         summary="Отримати одноразове посилання для завантаження CV",
+        description="Отримує ID користувача та ім'я файлу CV, перевіряє, чи файл існує і належить користувачеві, і генерує одноразове тимчасове посилання для завантаження.",
         request=DownloadCVRequestSerializer,
         responses={
-            200: OpenApiResponse(response={'type': 'object', 'properties': {'download_url': {'type': 'string'}}})},
+            200: OpenApiResponse(
+                response={'type': 'object', 'properties': {
+                    'download_url': {'type': 'string', 'example': '/api/cvs/download-cv-file/abc123-def456-ghi789/'}}},
+                description='Одноразове посилання для завантаження файлу'
+            ),
+            400: OpenApiResponse(description='Помилка валідації запиту'),
+            404: OpenApiResponse(description='CV не знайдено або файл не існує'),
+        },
     )
     def post(self, request):
-        serializer = DownloadCVRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
+        logger.info(f"Отримано POST запит на /api/cvs/get-download-link/ від {request.META.get('REMOTE_ADDR')}")
+        logger.debug(f"Тіло запиту: {request.data}")
 
-        user_id = serializer.validated_data['user_id']
-        filename = serializer.validated_data['filename']
+        serializer = DownloadCVRequestSerializer(data=request.data)
+        validation_response = handle_serializer_validation(serializer, logger, "GetDownloadLinkView")
+        if validation_response:
+            logger.warning(f"Помилка валідації у GetDownloadLinkView: {validation_response.data}")
+            return validation_response
+
+        user_id = serializer.validated_data.get('user_id')
+        filename = serializer.validated_data.get('filename')
+
+        logger.info(f"Шукаємо CV для user_id={user_id}, filename={filename}")
 
         try:
             cv = CV.objects.get(user_id=user_id, cv_file=filename)
+            logger.info(f"Знайдено CV з ID {cv.id} для user_id={user_id}, файл: {cv.cv_file.name}")
         except CV.DoesNotExist:
-            return Response({'error': 'CV не знайдено.'}, status=404)
+            logger.warning(f"CV з ім'ям файлу '{filename}' для користувача {user_id} не знайдено.")
+            return Response({'error': 'CV не знайдено або файл не належить користувачеві.'},
+                            status=status.HTTP_404_NOT_FOUND)
 
-        if not os.path.exists(cv.cv_file.path):
-            return Response({'error': 'Файл CV не знайдено на сервері.'}, status=404)
+        file_path = cv.cv_file.path
+        logger.debug(f"Перевіряємо файл за шляхом: {file_path}")
+        if not os.path.exists(file_path):
+            logger.error(f"Файл CV '{file_path}' не знайдено на диску.")
+            return Response({'error': 'Файл CV не знайдено на сервері.'}, status=status.HTTP_404_NOT_FOUND)
 
         token = str(uuid.uuid4())
-        cache.set(f"cv_download_token:{token}", cv.cv_file.path, timeout=300)
+        cache_key = f"cv_download_token:{token}"
+        cache.set(cache_key, file_path, timeout=300)
+        logger.info(f"Токен {token} збережено в кеші для файлу {file_path}")
+
         download_url = request.build_absolute_uri(f'/api/cvs/download-cv-file/{token}/')
-        return Response({'download_url': download_url})
+        logger.info(
+            f"Згенеровано одноразове посилання для завантаження CV '{filename}' для користувача {user_id}. Посилання: {download_url}")
+        return Response({'download_url': download_url}, status=status.HTTP_200_OK)
