@@ -1,12 +1,15 @@
 import logging
 import os
 import time
+import uuid
 
 import google.generativeai as genai
+from django.core.cache import cache
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from dotenv import load_dotenv
 from drf_spectacular.utils import extend_schema, OpenApiResponse
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from jsonschema import ValidationError
 from rest_framework import generics
 from rest_framework import status
@@ -15,13 +18,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
-from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer, User
-from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer
-from .serializers import ExtractTextFromCVRequestSerializer, ExtractTextFromCVResponseSerializer
+from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer, CVSerializer, CoverLetterSerializer, \
+    CVGenerationSerializer, DownloadCVRequestSerializer, ExtractTextFromCVRequestSerializer, \
+    ExtractTextFromCVResponseSerializer, User
 from ..models import CV
 from ..service import analyze_cv_with_ai, extract_text_from_cv
 
@@ -410,3 +412,36 @@ class AnalyzeCVView(APIView):
         except Exception as e:
             logger.error(f"Неочікувана помилка при аналізі CV для користувача {user_id}: {e}", exc_info=True)
             return Response({'error': 'Внутрішня помилка сервера'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GetDownloadLinkView(APIView):
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+
+    @extend_schema(
+        tags=["CVs"],
+        summary="Отримати одноразове посилання для завантаження CV",
+        request=DownloadCVRequestSerializer,
+        responses={
+            200: OpenApiResponse(response={'type': 'object', 'properties': {'download_url': {'type': 'string'}}})},
+    )
+    def post(self, request):
+        serializer = DownloadCVRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        user_id = serializer.validated_data['user_id']
+        filename = serializer.validated_data['filename']
+
+        try:
+            cv = CV.objects.get(user_id=user_id, cv_file=filename)
+        except CV.DoesNotExist:
+            return Response({'error': 'CV не знайдено.'}, status=404)
+
+        if not os.path.exists(cv.cv_file.path):
+            return Response({'error': 'Файл CV не знайдено на сервері.'}, status=404)
+
+        token = str(uuid.uuid4())
+        cache.set(f"cv_download_token:{token}", cv.cv_file.path, timeout=300)
+        download_url = request.build_absolute_uri(f'/api/cvs/download-cv-file/{token}/')
+        return Response({'download_url': download_url})

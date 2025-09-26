@@ -144,3 +144,8 @@ class AnalyzeCVResponseSerializer(serializers.Serializer):
     salary_min = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     salary_max = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     salary_currency = serializers.CharField(required=False, allow_null=True)
+
+
+class DownloadCVRequestSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(help_text="ID користувача")
+    filename = serializers.CharField(help_text="Ім'я файлу CV")
