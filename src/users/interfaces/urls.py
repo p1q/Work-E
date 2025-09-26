@@ -1,17 +1,9 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-from .views import (
-    UserListCreateView,
-    UserRetrieveUpdateDestroyView,
-    RegisterView,
-    LoginView,
-    CurrentUserView,
-    profile,   # функціональний в’ю
-)
+from .views import (UserListCreateView, UserRetrieveUpdateDestroyView, RegisterView, LoginView, CurrentUserView)
+from .views_auth import LogoutView
 from .views_google import GoogleLoginView
 from .views_linkedin import LinkedInLoginView
-from .views_auth import LogoutView
 
 urlpatterns = [
     # users CRUD
@@ -27,6 +19,4 @@ urlpatterns = [
     # social logins
     path('google/login/', GoogleLoginView.as_view(), name='google-login'),
     path('linkedin/login/', LinkedInLoginView.as_view(), name='linkedin-login'),
-
-    # path('profile/', profile, name='cv-profile'),
 ]
