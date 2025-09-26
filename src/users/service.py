@@ -11,6 +11,7 @@ def fetch_google_userinfo(access_token):
 
     return resp.json()
 
+
 def calculate_profile_completion(user):
     fields = ["first_name", "last_name", "email", "linkedin_id", "google_id", "avatar_url"]
     filled = sum(1 for field in fields if getattr(user, field))
