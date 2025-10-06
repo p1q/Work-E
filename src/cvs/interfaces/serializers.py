@@ -33,11 +33,10 @@ class CVSerializer(serializers.ModelSerializer):
             'position_target',
             'first_name', 'last_name', 'email',
             'phone', 'date_of_birth', 'gender',
-            'address_street', 'address_city',
-            'address_postal_code', 'address_country',
+            'street', 'city', 'postal_code', 'country',
             'overview', 'hobbies',
             'status', 'locale', 'created_at', 'updated_at',
-            'links_cv_file', 'links_linkedin_url', 'links_portfolio_url',
+            'cv_file', 'linkedin_url', 'portfolio_url',
             'analyzed'
         ]
         read_only_fields = ['id', 'user', 'analyzed', 'created_at', 'updated_at']

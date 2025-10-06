@@ -1,11 +1,11 @@
 import uuid
-
-from django.conf import settings
-from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import ValidationError
-from django.core.validators import EmailValidator
 from django.db import models
+from django.contrib.postgres.fields import ArrayField
 from phonenumber_field.modelfields import PhoneNumberField
+from django.core.exceptions import ValidationError
+from django.conf import settings
+from django.core.validators import EmailValidator
+import re
 
 
 def validate_name(value):
@@ -52,28 +52,32 @@ class CV(models.Model):
 
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cvs')
+
+    # Особиста інформація
     first_name = models.CharField(max_length=80, validators=[validate_name])
     last_name = models.CharField(max_length=80, validators=[validate_name])
     email = models.EmailField(validators=[EmailValidator()])
     phone = PhoneNumberField(blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=20, blank=True)
-    address_street = models.CharField(max_length=200, blank=True)
-    address_city = models.CharField(max_length=120)
-    address_postal_code = models.CharField(max_length=20, blank=True)
-    address_country = models.CharField(max_length=100)
-    address_country_code = models.CharField(max_length=2, blank=True)
+    street = models.CharField(max_length=200, blank=True)
+    city = models.CharField(max_length=120)
+    postal_code = models.CharField(max_length=20, blank=True)
+    country = models.CharField(max_length=100)
+    country_code = models.CharField(max_length=2, blank=True)
     overview = models.TextField(blank=True)
     hobbies = models.TextField(blank=True)
+
+    # Інші поля
     position_target = models.CharField(max_length=120, blank=True)
     work_options = models.OneToOneField(WorkOptions, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     locale = models.CharField(max_length=10, choices=LOCALE_CHOICES, default='uk-UA')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    links_cv_file = models.CharField(max_length=255, blank=True)
-    links_linkedin_url = models.URLField(blank=True)
-    links_portfolio_url = models.URLField(blank=True)
+    cv_file = models.CharField(max_length=255, blank=True)
+    linkedin_url = models.URLField(blank=True)
+    portfolio_url = models.URLField(blank=True)
     salary_min = models.PositiveIntegerField(null=True, blank=True)
     salary_max = models.PositiveIntegerField(null=True, blank=True)
     salary_currency = models.CharField(max_length=3, blank=True)
