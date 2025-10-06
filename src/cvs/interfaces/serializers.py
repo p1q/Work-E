@@ -24,20 +24,18 @@ class CoverLetterSerializer(serializers.Serializer):
 
 
 class CVSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
-    email = serializers.EmailField(write_only=True)
     cv_file = serializers.FileField(write_only=True)
 
     class Meta:
         model = CV
         fields = [
-            'id', 'user', 'email', 'cv_file',
+            'id', 'user', 'cv_file',
             'position_target',
-            'personal_first_name', 'personal_last_name', 'personal_email',
-            'personal_phone', 'personal_date_of_birth', 'personal_gender',
-            'personal_address_street', 'personal_address_city',
-            'personal_address_postal_code', 'personal_address_country',
-            'personal_overview', 'personal_hobbies',
+            'first_name', 'last_name', 'email',
+            'phone', 'date_of_birth', 'gender',
+            'address_street', 'address_city',
+            'address_postal_code', 'address_country',
+            'overview', 'hobbies',
             'status', 'locale', 'created_at', 'updated_at',
             'links_cv_file', 'links_linkedin_url', 'links_portfolio_url',
             'analyzed'
