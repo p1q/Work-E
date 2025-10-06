@@ -1,4 +1,3 @@
-import os
 import uuid
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
@@ -76,7 +75,6 @@ class CV(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     cv_file = models.FileField(upload_to='', storage=CVFileStorage(), blank=True)
-    original_filename = models.CharField(max_length=255, blank=True, null=True)
     linkedin_url = models.URLField(blank=True)
     portfolio_url = models.URLField(blank=True)
     salary_min = models.PositiveIntegerField(null=True, blank=True)
@@ -95,23 +93,17 @@ class CV(models.Model):
             models.UniqueConstraint(fields=['user', 'email'], name='unique_user_email_per_cv')
         ]
 
-    def save(self, *args, **kwargs):
-        if self.cv_file and not self.original_filename:
-            self.original_filename = os.path.basename(self.cv_file.name)
-        super().save(*args, **kwargs)
-
     def clean(self):
         super().clean()
         if self.salary_min and self.salary_max and self.salary_min > self.salary_max:
             raise ValidationError('Мінімальна зарплата не може бути більшою за максимальну.')
 
     def __str__(self):
-        filename = self.original_filename or os.path.basename(self.cv_file.name) if self.cv_file else "No File"
-        return f"CV #{self.id} for User {self.user_id}: {filename}"
+        return f"CV #{self.id} for User {self.user_id}: {self.cv_file.name if self.cv_file else 'No File'}"
 
     @property
     def filename(self):
-        return self.original_filename or (os.path.basename(self.cv_file.name) if self.cv_file else "No File")
+        return self.cv_file.name if self.cv_file else "No File"
 
 
 class WorkExperience(models.Model):
