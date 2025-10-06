@@ -25,21 +25,22 @@ class CoverLetterSerializer(serializers.Serializer):
 
 class CVSerializer(serializers.ModelSerializer):
     cv_file = serializers.FileField(write_only=True)
+    cv_file_name = serializers.CharField(source='cv_file', read_only=True)
 
     class Meta:
         model = CV
         fields = [
-            'id', 'user', 'cv_file',
+            'id', 'user', 'cv_file', 'cv_file_name',
             'position_target',
             'first_name', 'last_name', 'email',
             'phone', 'date_of_birth', 'gender',
             'street', 'city', 'postal_code', 'country',
             'overview', 'hobbies',
             'status', 'locale', 'created_at', 'updated_at',
-            'cv_file', 'linkedin_url', 'portfolio_url',
+            'linkedin_url', 'portfolio_url',
             'analyzed'
         ]
-        read_only_fields = ['id', 'user', 'analyzed', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'cv_file_name', 'analyzed', 'created_at', 'updated_at']
 
     def validate_cv_file(self, file):
         # 1) Size checks
