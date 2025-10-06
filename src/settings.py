@@ -183,8 +183,7 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-MEDIA_ROOT = Path(os.getenv('CV_FILES_PATH', BASE_DIR / 'media'))
-MEDIA_URL = '/media/'
+CV_FILES_PATH = Path(os.getenv('CV_FILES_PATH'))
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
