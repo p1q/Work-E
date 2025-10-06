@@ -1,11 +1,13 @@
+import os
 import uuid
-
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
 from django.db import models
 from phonenumber_field.modelfields import PhoneNumberField
+
+from src.cvs.storage import CVFileStorage
 
 
 def validate_name(value):
@@ -53,7 +55,6 @@ class CV(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cvs')
 
-    # Особиста інформація
     first_name = models.CharField(max_length=80, validators=[validate_name])
     last_name = models.CharField(max_length=80, validators=[validate_name])
     email = models.EmailField(validators=[EmailValidator()])
@@ -68,14 +69,14 @@ class CV(models.Model):
     overview = models.TextField(blank=True)
     hobbies = models.TextField(blank=True)
 
-    # Інші поля
     position_target = models.CharField(max_length=120, blank=True)
     work_options = models.OneToOneField(WorkOptions, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     locale = models.CharField(max_length=10, choices=LOCALE_CHOICES, default='uk-UA')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    cv_file = models.CharField(max_length=255, blank=True)
+    cv_file = models.FileField(upload_to='', storage=CVFileStorage(), blank=True)
+    original_filename = models.CharField(max_length=255, blank=True, null=True)
     linkedin_url = models.URLField(blank=True)
     portfolio_url = models.URLField(blank=True)
     salary_min = models.PositiveIntegerField(null=True, blank=True)
@@ -94,10 +95,23 @@ class CV(models.Model):
             models.UniqueConstraint(fields=['user', 'email'], name='unique_user_email_per_cv')
         ]
 
+    def save(self, *args, **kwargs):
+        if self.cv_file and not self.original_filename:
+            self.original_filename = os.path.basename(self.cv_file.name)
+        super().save(*args, **kwargs)
+
     def clean(self):
         super().clean()
         if self.salary_min and self.salary_max and self.salary_min > self.salary_max:
             raise ValidationError('Мінімальна зарплата не може бути більшою за максимальну.')
+
+    def __str__(self):
+        filename = self.original_filename or os.path.basename(self.cv_file.name) if self.cv_file else "No File"
+        return f"CV #{self.id} for User {self.user_id}: {filename}"
+
+    @property
+    def filename(self):
+        return self.original_filename or (os.path.basename(self.cv_file.name) if self.cv_file else "No File")
 
 
 class WorkExperience(models.Model):

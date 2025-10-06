@@ -26,21 +26,23 @@ class CoverLetterSerializer(serializers.Serializer):
 class CVSerializer(serializers.ModelSerializer):
     cv_file = serializers.FileField(write_only=True)
     cv_file_name = serializers.CharField(source='cv_file', read_only=True)
+    filename = serializers.CharField(read_only=True)
 
     class Meta:
         model = CV
         fields = [
-            'id', 'user', 'cv_file', 'cv_file_name',
+            'id', 'user', 'cv_file', 'cv_file_name', 'filename',
             'position_target',
             'first_name', 'last_name', 'email',
             'phone', 'date_of_birth', 'gender',
             'street', 'city', 'postal_code', 'country',
-            'overview', 'hobbies',
+            'country_code', 'overview', 'hobbies',
             'status', 'locale', 'created_at', 'updated_at',
             'linkedin_url', 'portfolio_url',
-            'analyzed'
+            'salary_min', 'salary_max', 'salary_currency',
+            'level', 'categories', 'analyzed'
         ]
-        read_only_fields = ['id', 'user', 'cv_file_name', 'analyzed', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'cv_file_name', 'filename', 'analyzed', 'created_at', 'updated_at']
 
     def validate_cv_file(self, file):
         # 1) Size checks
@@ -98,6 +100,21 @@ class CVSerializer(serializers.ModelSerializer):
                 'email': f'User with email \"{email}\" not found.'
             })
         return CV.objects.create(user=user, **validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            if attr == 'cv_file':
+                setattr(instance, 'cv_file', value)
+            else:
+                setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.cv_file:
+            data['cv_file'] = instance.filename
+        return data
 
 
 class ExtractTextFromCVRequestSerializer(serializers.Serializer):
