@@ -1,13 +1,14 @@
+import io
 import json
 import logging
-import requests
+
 import pdfplumber
-import io
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from .models import CV
-from src.openapi.service import call_openapi_ai
+
 from src.openapi.prompts import CV_ANALYSIS_PROMPT
+from src.openapi.service import call_openapi_ai
+from .models import CV, Skill, Language, WorkOptions
 
 logger = logging.getLogger(__name__)
 
@@ -58,93 +59,110 @@ def extract_text_from_cv(cv):
 
 def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
     try:
-        try:
-            cv = CV.objects.get(id=cv_id, user_id=user_id)
-        except CV.DoesNotExist:
-            logger.error(f"CV з ID {cv_id} для користувача {user_id} не знайдено.")
-            raise ValidationError("CV не знайдено.")
+        cv = CV.objects.get(id=cv_id, user_id=user_id)
+    except CV.DoesNotExist:
+        logger.error(f"CV з ID {cv_id} для користувача {user_id} не знайдено.")
+        raise ValidationError("CV не знайдено.")
 
-        # Визначення тексту CV
-        if cv_text_override is not None:
-            cv_text = cv_text_override
-            method_used = "provided_by_view"
-            extracted_cv_id = cv.id
-            filename = cv.cv_file.name if cv.cv_file else "unknown"
-            logger.debug(f"Використано текст CV, наданий з views.py, для CV {cv.id}.")
-        else:
-            cv_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
-
+    # Видобути текст
+    if cv_text_override is not None:
+        cv_text = cv_text_override
+        logger.debug(f"Використано наданий текст для CV {cv.id}.")
+    else:
+        cv_text, _, _, _ = extract_text_from_cv(cv)
         if not cv_text:
-            logger.warning(f"Не вдалося видобути текст з CV {cv_id} користувача {user_id}.")
             raise ValidationError("Не вдалося видобути текст з резюме.")
 
-        prompt = CV_ANALYSIS_PROMPT.format(cv_text=cv_text)
-        logger.debug(f"Сформовано промпт довжиною {len(prompt)} символів для CV {cv_id}.")
+    # Виклик ШІ
+    prompt = CV_ANALYSIS_PROMPT.format(cv_text=cv_text)
+    ai_response_data = call_openapi_ai(messages=[{"role": "user", "content": prompt}],
+                                       model=getattr(settings, 'OPENAPI_AI_MODEL', 'default-model'))
 
-        ai_url = getattr(settings, 'OPENAPI_AI_URL')
-        if not ai_url:
-            logger.error("OPENAPI_AI_URL не налаштовано в settings.")
-            raise Exception("OPENAPI_AI_URL не налаштовано.")
+    # Витягти JSON
+    content = ""
+    if 'choices' in ai_response_data and ai_response_data['choices']:
+        content = ai_response_data['choices'][0].get('message', {}).get('content', '')
+    elif 'message' in ai_response_data:
+        content = ai_response_data.get('message', {}).get('content', '')
+    else:
+        content = str(ai_response_data)
 
-        ai_request_data = {
-            "model": getattr(settings, 'OPENAPI_AI_MODEL', 'default-model'),
-            "messages": [{"role": "user", "content": prompt}]
-        }
+    # Очистити від ```json
+    content = content.strip()
+    if content.startswith("```json"):
+        content = content[7:]
+    if content.endswith("```"):
+        content = content[:-3]
+    content = content.strip()
 
-        logger.info(f"Надсилання запиту до ШІ для аналізу CV {cv_id} користувача {user_id}...")
-        logger.debug(f"Дані запиту до ШІ: {ai_request_data}")
+    if not content:
+        raise Exception("Порожній content від ШІ.")
 
-        ai_response_data = call_openapi_ai(messages=ai_request_data['messages'], model=ai_request_data['model'])
+    try:
+        parsed_data = json.loads(content)
+    except json.JSONDecodeError as e:
+        logger.error(f"Недійсний JSON: {content[:200]}")
+        raise Exception(f"Недійсний JSON: {str(e)}")
 
-        if not ai_response_data:
-            logger.error(f"ШІ повернув порожню відповідь для CV {cv_id} користувача {user_id}.")
-            raise Exception("Порожня відповідь від ШІ.")
+    # 1. WorkOptions
+    if cv.work_options is None:
+        cv.work_options = WorkOptions.objects.create()
+    wo = cv.work_options
+    wo.countries = parsed_data.get("countries") or []
+    wo.cities = parsed_data.get("cities") or []
+    wo.is_office = parsed_data.get("is_office")
+    wo.is_remote = parsed_data.get("is_remote")
+    wo.is_hybrid = parsed_data.get("is_hybrid")
+    wo.willing_to_relocate = parsed_data.get("willing_to_relocate")
+    wo.save()
 
-        logger.info(f"Отримано відповідь від ШІ для CV {cv_id} користувача {user_id}.")
-        logger.debug(f"Сирий відповідь від ШІ (тип: {type(ai_response_data)}): {ai_response_data}")
+    # 2. Skills
+    Skill.objects.filter(cv=cv).delete()
+    for i, name in enumerate(parsed_data.get("skills", [])):
+        if isinstance(name, str) and name.strip():
+            Skill.objects.create(cv=cv, name=name.strip(), order_index=i)
 
-        # 1. Витягти content
-        content = ""
-        if 'choices' in ai_response_data and ai_response_data['choices']:
-            content = ai_response_data['choices'][0].get('message', {}).get('content', '')
-        elif 'message' in ai_response_data: # Альтернативна структура?
-             content = ai_response_data.get('message', {}).get('content', '')
-        else:
-            logger.warning(f"Неочікувана структура відповіді ШІ для CV {cv_id}: {list(ai_response_data.keys()) if isinstance(ai_response_data, dict) else type(ai_response_data)}")
-            content = str(ai_response_data) # Перетворити на рядок, якщо структура зовсім неочікувана
+    # 3. Languages
+    Language.objects.filter(cv=cv).delete()
+    for i, lang_data in enumerate(parsed_data.get("languages", [])):
+        if isinstance(lang_data, dict):
+            lang_name = lang_data.get("language")
+            lang_level = lang_data.get("level")
+            if lang_name and isinstance(lang_name, str):
+                Language.objects.create(
+                    cv=cv,
+                    name=lang_name.strip(),
+                    level=lang_level if lang_level in [c[0] for c in Language.LEVEL_CHOICES] else None,
+                    order_index=i
+                )
 
-        # 2. Видалити обгортку ```json ... ```
-        content = content.strip()
-        if content.startswith("```json"):
-            content = content[7:] # Видалити ```json
-        if content.endswith("```"):
-            content = content[:-3] # Видалити ```
+    # 4. Поля в CV
+    cv.level = parsed_data.get("level")
+    cv.categories = parsed_data.get("categories") or []
+    cv.salary_min = parsed_data.get("salary_min")
+    cv.salary_max = parsed_data.get("salary_max")
+    cv.salary_currency = parsed_data.get("salary_currency")
+    cv.analyzed = True
+    cv.save(update_fields=[
+        'level', 'categories', 'salary_min', 'salary_max', 'salary_currency', 'analyzed'
+    ])
 
-        if not content:
-             logger.error(f"Відповідь ШІ для CV {cv_id} не містить content або він порожній після очищення.")
-             raise Exception("Порожній або некоректний content у відповіді ШІ.")
-
-        # 3. Перетворити JSON-рядок у Python-словник
-        try:
-            parsed_data = json.loads(content)
-            logger.info(f"Успішно розпаршено JSON з відповіді ШІ для CV {cv_id}.")
-            # 4. Повернути словник
-            return parsed_data
-        except json.JSONDecodeError as e:
-            logger.error(f"Помилка декодування JSON з відповіді ШІ для CV {cv_id}: {e}. Неочищений content: {content[:200]}...")
-            raise Exception(f"Помилка обробки відповіді ШІ: Недійсний JSON. {str(e)}")
-
-    except ValidationError:
-        raise
-    except requests.exceptions.Timeout:
-        logger.error(f"Таймаут при запиті до ШІ для CV {cv_id} користувача {user_id}.")
-        raise Exception("Таймаут сервісу ШІ.")
-    except requests.exceptions.ConnectionError:
-        logger.error(f"Помилка з'єднання з сервісом ШІ для CV {cv_id} користувача {user_id}.")
-        raise Exception("Помилка з'єднання з сервісом ШІ.")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Помилка HTTP-запиту до ШІ для CV {cv_id} користувача {user_id}: {e}", exc_info=True)
-        raise Exception(f'Помилка взаємодії з сервісом ШІ: {str(e)}')
-    except Exception as e:
-        logger.error(f"Неочікувана помилка при аналізі CV {cv_id} користувача {user_id} ШІ: {e}", exc_info=True)
-        raise Exception(f'Сталася неочікувана помилка: {str(e)}')
+    # Повернути дані для відповіді
+    return {
+        "level": cv.level,
+        "categories": cv.categories,
+        "countries": wo.countries,
+        "cities": wo.cities,
+        "is_office": wo.is_office,
+        "is_remote": wo.is_remote,
+        "is_hybrid": wo.is_hybrid,
+        "willing_to_relocate": wo.willing_to_relocate,
+        "skills": [s.name for s in Skill.objects.filter(cv=cv).order_by('order_index')],
+        "languages": [
+            {"language": l.name, "level": l.level}
+            for l in Language.objects.filter(cv=cv).order_by('order_index')
+        ],
+        "salary_min": cv.salary_min,
+        "salary_max": cv.salary_max,
+        "salary_currency": cv.salary_currency,
+    }

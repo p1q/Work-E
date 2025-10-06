@@ -25,37 +25,24 @@ class CoverLetterSerializer(serializers.Serializer):
 
 class CVSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
-    filename = serializers.CharField(read_only=True)
     email = serializers.EmailField(write_only=True)
     cv_file = serializers.FileField(write_only=True)
-
-    level = serializers.CharField(required=False, allow_null=True)
-    categories = serializers.ListField(child=serializers.CharField(max_length=100), required=False)
-    countries = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
-    cities = serializers.ListField(child=serializers.CharField(max_length=50), required=False)
-    is_office = serializers.BooleanField(required=False, allow_null=True)
-    is_remote = serializers.BooleanField(required=False, allow_null=True)
-    is_hybrid = serializers.BooleanField(required=False, allow_null=True)
-    willing_to_relocate = serializers.BooleanField(required=False, allow_null=True)
-    languages = serializers.JSONField(source='languages_detailed', required=False, allow_null=True)
-    skills = serializers.ListField(child=serializers.CharField(max_length=100), source='skills_detailed',
-                                   required=False)
-    salary_min = serializers.IntegerField(required=False, allow_null=True, min_value=0)
-    salary_max = serializers.IntegerField(required=False, allow_null=True, min_value=0)
-    salary_currency = serializers.CharField(required=False, allow_null=True, max_length=3)
-    analyzed = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = CV
         fields = [
-            'id', 'user', 'email', 'filename', 'cv_file', 'uploaded_at',
-            'level', 'categories', 'countries', 'cities',
-            'is_office', 'is_remote', 'is_hybrid', 'willing_to_relocate',
-            'languages', 'skills',
-            'salary_min', 'salary_max', 'salary_currency',
+            'id', 'user', 'email', 'cv_file',
+            'position_target',
+            'personal_first_name', 'personal_last_name', 'personal_email',
+            'personal_phone', 'personal_date_of_birth', 'personal_gender',
+            'personal_address_street', 'personal_address_city',
+            'personal_address_postal_code', 'personal_address_country',
+            'personal_overview', 'personal_hobbies',
+            'status', 'locale', 'created_at', 'updated_at',
+            'links_cv_file', 'links_linkedin_url', 'links_portfolio_url',
             'analyzed'
         ]
-        read_only_fields = ['id', 'user', 'filename', 'uploaded_at', 'analyzed']
+        read_only_fields = ['id', 'user', 'analyzed', 'created_at', 'updated_at']
 
     def validate_cv_file(self, file):
         # 1) Size checks
