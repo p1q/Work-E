@@ -1,11 +1,11 @@
 import uuid
-from django.db import models
-from django.contrib.postgres.fields import ArrayField
-from phonenumber_field.modelfields import PhoneNumberField
-from django.core.exceptions import ValidationError
+
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
-import re
+from django.db import models
+from phonenumber_field.modelfields import PhoneNumberField
 
 
 def validate_name(value):
