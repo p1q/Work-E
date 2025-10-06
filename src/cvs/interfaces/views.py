@@ -46,7 +46,7 @@ def _get_latest_cv_for_user(user_id, logger):
         logger.warning(f"Користувач із id {user_id} не знайдений.")
         return None, Response({'error': f'Користувача з ID {user_id} не знайдено.'}, status=status.HTTP_404_NOT_FOUND)
 
-    cv = CV.objects.filter(user=user).order_by('-uploaded_at').first()
+    cv = CV.objects.filter(user=user).order_by('-created_at').first()
     if not cv:
         logger.info(f"CV для користувача {user_id} не знайдено")
         return None, Response({'error': f'Резюме для користувача з ID {user_id} не знайдено.'},
