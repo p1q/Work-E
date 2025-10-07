@@ -1,5 +1,5 @@
 import io
-import json
+import json, json5
 import logging
 
 import pdfplumber
@@ -51,8 +51,7 @@ def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
 
             if not extracted_text:
                 logger.error(f"Не вдалося видобути текст із CV {cv.id}")
-                raise ValidationError(
-                    'Не вдалося видобути текст із PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.')
+                raise ValidationError('Не вдалося видобути текст із PDF файлу. Файл може бути порожнім або пошкодженим.')
 
         prompt = CV_ANALYSIS_PROMPT.format(cv_text=extracted_text)
         ai_response_data = call_openapi_ai(messages=[{"role": "user", "content": prompt}],
@@ -79,8 +78,13 @@ def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
         try:
             parsed_data = json.loads(content)
         except json.JSONDecodeError as e:
-            logger.error(f"Недійсний JSON: {content[:200]}")
-            raise Exception(f"Недійсний JSON: {str(e)}")
+            logger.warning(f"Помилка стандартного JSON: {e}. Намагаємося виправити за допомогою json5...")
+            try:
+                parsed_data = json5.loads(content)
+            except (json.JSONDecodeError, ValueError) as fix_e:
+                logger.error(f"Не вдалося виправити JSON: {fix_e}")
+                logger.error(f"Оригінальний вміст: {content[:500]}...")
+                raise Exception(f"Недійсний JSON: {str(fix_e)}")
 
         if cv_text_override is None:
             wo = cv.work_options or WorkOptions.objects.create(cv=cv)

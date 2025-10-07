@@ -25,3 +25,4 @@ protobuf~=5.29.5
 jsonschema~=4.23.0
 pdfplumber
 django-phonenumber-field[phonenumbers]
+json5
