@@ -24,11 +24,10 @@ from rest_framework.views import APIView
 
 from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
-from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer, CVSerializer, CoverLetterSerializer, \
-    CVGenerationSerializer, DownloadCVRequestSerializer, ExtractTextFromCVResponseSerializer, User, \
-    ExtractTextFromCVUploadRequestSerializer
+from .serializers import CVSerializer, CoverLetterSerializer, CVGenerationSerializer, DownloadCVRequestSerializer, \
+    ExtractTextFromCVResponseSerializer, User, ExtractTextFromCVUploadRequestSerializer
 from ..models import CV
-from ..service import analyze_cv_with_ai, extract_text_from_cv, extract_text_from_pdf_bytes
+from ..service import analyze_cv_with_ai, extract_text_from_pdf_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -408,7 +407,6 @@ ANALYZE_CV_UPLOAD = {
         }
     },
     'responses': {
-        200: AnalyzeCVResponseSerializer,
         400: OpenApiResponse(description='Помилка в запиті або обробці PDF'),
         500: OpenApiResponse(description='Внутрішня помилка сервера'),
     }
@@ -444,24 +442,20 @@ class AnalyzeCVView(APIView):
             if not extracted_text:
                 logger.warning(f"Не вдалося видобути текст з завантаженого PDF файлу: {uploaded_pdf_file.name}")
                 return Response({
-                                    'error': 'Не вдалося видобути текст з PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.'},
-                                status=status.HTTP_400_BAD_REQUEST)
+                    'error': 'Не вдалося видобути текст з PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.'},
+                    status=status.HTTP_400_BAD_REQUEST)
 
             import uuid
             anonymous_user_id = uuid.uuid4()
             temp_cv_id = uuid.uuid4()
 
             ai_extracted_data = analyze_cv_with_ai(temp_cv_id, anonymous_user_id, cv_text_override=extracted_text)
+            if not ai_extracted_data or ai_extracted_data == '{}':
+                logger.error(f"ШІ не відповів, спробуйте ще раз.")
+                return Response({'error': 'Не вдалося отримати дані від ШІ.'}, status=status.HTTP_408_REQUEST_TIMEOUT)
 
-            response_serializer = AnalyzeCVResponseSerializer(data=ai_extracted_data)
-            if response_serializer.is_valid():
-                logger.info(f"Аналіз завантаженого PDF файлу {uploaded_pdf_file.name} успішно завершено.")
-                return Response(response_serializer.data, status=status.HTTP_200_OK)
-            else:
-                logger.error(
-                    f"Помилка валідації даних ШІ для файлу {uploaded_pdf_file.name}: {response_serializer.errors}")
-                return Response({'error': 'Внутрішня помилка сервера при обробці даних ШІ'},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.info(f"Аналіз завантаженого PDF файлу {uploaded_pdf_file.name} успішно завершено.")
+            return Response(ai_extracted_data, status=status.HTTP_200_OK)
 
         except ValidationError as e:
             logger.warning(f"Помилка валідації при обробці PDF файлу {uploaded_pdf_file.name}: {e.message}")

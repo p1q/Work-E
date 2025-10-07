@@ -286,10 +286,6 @@ class AnalyzeCVRequestSerializer(serializers.Serializer):
     cv_id = serializers.UUIDField(required=True)
 
 
-class AnalyzeCVResponseSerializer(serializers.Serializer):
-    message = serializers.CharField()
-
-
 class CoverLetterSerializer(serializers.Serializer):
     coverLetter = serializers.CharField()
     job_description = serializers.CharField()
