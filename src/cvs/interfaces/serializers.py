@@ -1,19 +1,295 @@
-import os
-
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from pikepdf import Pdf, PdfError
+from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
-from ..models import CV, Personal
+from ..models import CV, WorkExperience, Education, Course, Skill, Language, Personal, Address, WorkOptions
 
 User = get_user_model()
 
 
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = ['id', 'street', 'city', 'postal_code', 'country']
+        read_only_fields = ['id']
+
+
+class WorkOptionsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkOptions
+        fields = ['id', 'countries', 'cities', 'is_office', 'is_remote', 'is_hybrid', 'willing_to_relocate']
+        read_only_fields = ['id']
+
+
 class PersonalSerializer(serializers.ModelSerializer):
+    address = AddressSerializer(required=False)
+
     class Meta:
         model = Personal
-        fields = ['first_name', 'last_name', 'email', 'phone', 'date_of_birth', 'gender']
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'phone',
+            'date_of_birth', 'gender', 'address', 'overview', 'hobbies'
+        ]
+        read_only_fields = ['id']
+
+    def validate_first_name(self, value):
+        if not (1 <= len(value.strip()) <= 80):
+            raise serializers.ValidationError("Ім'я має бути від 1 до 80 символів.")
+        if not all(c.isalpha() or c in ['-', ' '] for c in value.strip()):
+            raise serializers.ValidationError("Ім'я може містити лише літери, дефіс та пробіли.")
+        return value.strip()
+
+    def validate_last_name(self, value):
+        if not (1 <= len(value.strip()) <= 80):
+            raise serializers.ValidationError("Прізвище має бути від 1 до 80 символів.")
+        if not all(c.isalpha() or c in ['-', ' '] for c in value.strip()):
+            raise serializers.ValidationError("Прізвище може містити лише літери, дефіс та пробіли.")
+        return value.strip()
+
+
+class WorkExperienceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkExperience
+        fields = [
+            'id', 'position', 'company', 'start_date', 'end_date',
+            'is_current', 'responsibilities', 'order_index'
+        ]
+        read_only_fields = ['id', 'is_current']
+
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        if start_date and end_date and start_date > end_date:
+            raise ValidationError("Дата початку не може бути пізніше дати завершення.")
+        return data
+
+
+class EducationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Education
+        fields = [
+            'id', 'major', 'institution', 'start_date', 'end_date',
+            'description', 'order_index'
+        ]
+        read_only_fields = ['id']
+
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        if start_date and end_date and start_date > end_date:
+            raise ValidationError("Дата початку не може бути пізніше дати завершення.")
+        return data
+
+
+class CourseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'name', 'provider', 'start_date', 'end_date',
+            'description', 'order_index'
+        ]
+        read_only_fields = ['id']
+
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        if start_date and end_date and start_date > end_date:
+            raise ValidationError("Дата початку не може бути пізніше дати завершення.")
+        return data
+
+
+class SkillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Skill
+        fields = ['id', 'name', 'description', 'level', 'order_index']
+        read_only_fields = ['id']
+
+
+class LanguageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Language
+        fields = ['id', 'name', 'level', 'description', 'order_index']
+        read_only_fields = ['id']
+
+
+class CVSerializer(serializers.ModelSerializer):
+    personal = PersonalSerializer(required=False)
+    work_experiences = WorkExperienceSerializer(many=True, required=False)
+    educations = EducationSerializer(many=True, required=False)
+    courses = CourseSerializer(many=True, required=False)
+    skills = SkillSerializer(many=True, required=False)
+    languages = LanguageSerializer(many=True, required=False)
+    work_options = WorkOptionsSerializer(required=False)
+    links = serializers.SerializerMethodField()
+    salary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CV
+        fields = [
+            'id', 'user_id', 'personal', 'position_target',
+            'work_experiences', 'work_options', 'educations', 'courses',
+            'skills', 'languages', 'status', 'locale',
+            'created_at', 'updated_at', 'links', 'salary',
+            'analyzed'
+        ]
+        read_only_fields = ['id', 'user_id', 'created_at', 'updated_at', 'analyzed']
+
+    def get_links(self, obj):
+        return {
+            'cv_file': obj.cv_file_name,
+            'linkedin_url': obj.linkedin_url,
+            'portfolio_url': obj.portfolio_url,
+        }
+
+    def get_salary(self, obj):
+        return {
+            'salary_min': obj.salary_min,
+            'salary_max': obj.salary_max,
+            'salary_currency': obj.salary_currency,
+        }
+
+    def create(self, validated_data):
+        work_experiences_data = validated_data.pop('work_experiences', [])
+        educations_data = validated_data.pop('educations', [])
+        courses_data = validated_data.pop('courses', [])
+        skills_data = validated_data.pop('skills', [])
+        languages_data = validated_data.pop('languages', [])
+        work_options_data = validated_data.pop('work_options', {})
+        personal_data = validated_data.pop('personal', {})
+        address_data = personal_data.pop('address', {})
+
+        address = None
+        if address_data:
+            address = Address.objects.create(**address_data)
+
+        if personal_data:
+            if address:
+                personal = Personal.objects.create(address=address, **personal_data)
+            else:
+                personal = Personal.objects.create(**personal_data)
+            validated_data['personal'] = personal
+
+        if work_options_data:
+            work_options = WorkOptions.objects.create(**work_options_data)
+            validated_data['work_options'] = work_options
+
+        cv = CV.objects.create(**validated_data)
+
+        for exp_data in work_experiences_data:
+            WorkExperience.objects.create(cv=cv, **exp_data)
+        for edu_data in educations_data:
+            Education.objects.create(cv=cv, **edu_data)
+        for course_data in courses_data:
+            Course.objects.create(cv=cv, **course_data)
+        for skill_data in skills_data:
+            Skill.objects.create(cv=cv, **skill_data)
+        for lang_data in languages_data:
+            Language.objects.create(cv=cv, **lang_data)
+
+        return cv
+
+    def update(self, instance, validated_data):
+        work_experiences_data = validated_data.pop('work_experiences', None)
+        educations_data = validated_data.pop('educations', None)
+        courses_data = validated_data.pop('courses', None)
+        skills_data = validated_data.pop('skills', None)
+        languages_data = validated_data.pop('languages', None)
+        work_options_data = validated_data.pop('work_options', None)
+        personal_data = validated_data.pop('personal', None)
+        address_data = personal_data.pop('address', {}) if personal_data else {}
+
+        if personal_data and instance.personal:
+            if address_data and instance.personal.address:
+                for attr, value in address_data.items():
+                    setattr(instance.personal.address, attr, value)
+                instance.personal.address.save()
+            elif address_data and not instance.personal.address:
+                address = Address.objects.create(**address_data)
+                instance.personal.address = address
+
+            for attr, value in personal_data.items():
+                if attr != 'address':  # Skip address as it's handled separately
+                    setattr(instance.personal, attr, value)
+            instance.personal.save()
+        elif personal_data and not instance.personal:
+            address = Address.objects.create(**address_data) if address_data else None
+            personal = Personal.objects.create(address=address, **personal_data)
+            instance.personal = personal
+
+        if work_options_data and instance.work_options:
+            for attr, value in work_options_data.items():
+                setattr(instance.work_options, attr, value)
+            instance.work_options.save()
+        elif work_options_data and not instance.work_options:
+            work_options = WorkOptions.objects.create(**work_options_data)
+            instance.work_options = work_options
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if work_experiences_data is not None:
+            instance.work_experiences.all().delete()
+            for exp_data in work_experiences_data:
+                WorkExperience.objects.create(cv=instance, **exp_data)
+
+        if educations_data is not None:
+            instance.educations.all().delete()
+            for edu_data in educations_data:
+                Education.objects.create(cv=instance, **edu_data)
+
+        if courses_data is not None:
+            instance.courses.all().delete()
+            for course_data in courses_data:
+                Course.objects.create(cv=instance, **course_data)
+
+        if skills_data is not None:
+            instance.skills.all().delete()
+            for skill_data in skills_data:
+                Skill.objects.create(cv=instance, **skill_data)
+
+        if languages_data is not None:
+            instance.languages.all().delete()
+            for lang_data in languages_data:
+                Language.objects.create(cv=instance, **lang_data)
+
+        return instance
+
+    def validate_position_target(self, value):
+        if value and len(value) > 120:
+            raise serializers.ValidationError("Посада/цільова позиція не може перевищувати 120 символів.")
+        return value
+
+    def validate_overview(self, value):
+        if value and len(value) > 2000:
+            raise serializers.ValidationError("Огляд не може перевищувати 2000 символів.")
+        return value
+
+    def validate_hobbies(self, value):
+        if value and len(value) > 1000:
+            raise serializers.ValidationError("Хобі не може перевищувати 1000 символів.")
+        return value
+
+    def validate(self, data):
+        salary_min = data.get('salary_min')
+        salary_max = data.get('salary_max')
+        if salary_min is not None and salary_max is not None and salary_min > salary_max:
+            raise serializers.ValidationError(
+                {'salary_min': 'Мінімальна зарплата не може бути більшою за максимальну.'})
+        return data
+
+
+class AnalyzeCVRequestSerializer(serializers.Serializer):
+    cv_id = serializers.UUIDField(required=True)
+
+
+class AnalyzeCVResponseSerializer(serializers.Serializer):
+    message = serializers.CharField()
+
+
+class CoverLetterSerializer(serializers.Serializer):
+    coverLetter = serializers.CharField()
+    job_description = serializers.CharField()
 
 
 class CVGenerationSerializer(serializers.Serializer):
@@ -24,132 +300,16 @@ class CVGenerationSerializer(serializers.Serializer):
     education = serializers.ListField(child=serializers.DictField())
 
 
-class CoverLetterSerializer(serializers.Serializer):
-    coverLetter = serializers.CharField()
-    job_description = serializers.CharField()
-
-
-class CVSerializer(serializers.ModelSerializer):
-    personal = PersonalSerializer(read_only=True)
-    cv_file = serializers.FileField(write_only=True)
-    cv_file_name = serializers.CharField(source='cv_file', read_only=True)
-    filename = serializers.CharField(read_only=True)
-
-    class Meta:
-        model = CV
-        fields = [
-            'id', 'user', 'cv_file', 'cv_file_name', 'filename',
-            'position_target', 'personal',
-            'status', 'locale', 'created_at', 'updated_at',
-            'linkedin_url', 'portfolio_url',
-            'salary_min', 'salary_max', 'salary_currency',
-            'level', 'categories', 'analyzed'
-        ]
-        read_only_fields = ['id', 'user', 'cv_file_name', 'filename', 'analyzed', 'created_at', 'updated_at']
-
-    def validate_cv_file(self, file):
-        # Проверка размера
-        if file.size == 0:
-            raise serializers.ValidationError("File cannot be empty.")
-        if file.size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
-            max_mb = settings.FILE_UPLOAD_MAX_MEMORY_SIZE // (1024 * 1024)
-            raise serializers.ValidationError(f"Maximum allowed file size is {max_mb}MB.")
-
-        # Проверка расширения файла
-        ext = os.path.splitext(file.name)[1].lower()
-        if ext != '.pdf':
-            raise serializers.ValidationError("Only PDF files are allowed.")
-
-        # Проверка содержимого PDF через pikepdf
-        try:
-            self._validate_pdf_with_pikepdf(file)
-        except serializers.ValidationError:
-            raise
-        except Exception:
-            raise serializers.ValidationError("Invalid or corrupted PDF file.")
-        finally:
-            file.seek(0)
-
-        return file
-
-    def _validate_pdf_with_pikepdf(self, file):
-        file.seek(0)
-        try:
-            pdf = Pdf.open(file, allow_overwriting_input=False)
-        except PdfError:
-            raise serializers.ValidationError("Invalid or corrupted PDF file.")
-
-        # Проверка на пустой PDF
-        if len(pdf.pages) == 0:
-            raise serializers.ValidationError("Empty PDF file.")
-
-        # Проверка на вложенные файлы
-        try:
-            attachments = list(pdf.attachments.keys())
-        except Exception:
-            attachments = []
-
-        if attachments:
-            names = ", ".join(attachments)
-            raise serializers.ValidationError(f"PDF contains embedded files: {names}")
-
-    def create(self, validated_data):
-        email = validated_data.pop('email')
-        try:
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError({
-                'email': f'User with email \"{email}\" not found.'
-            })
-        return CV.objects.create(user=user, **validated_data)
-
-    def update(self, instance, validated_data):
-        for attr, value in validated_data.items():
-            if attr == 'cv_file':
-                setattr(instance, 'cv_file', value)
-            else:
-                setattr(instance, attr, value)
-        instance.save()
-        return instance
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        if instance.cv_file:
-            data['cv_file'] = instance.filename
-        return data
+class DownloadCVRequestSerializer(serializers.Serializer):
+    cv_id = serializers.UUIDField(required=True)
 
 
 class ExtractTextFromCVRequestSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField(help_text="ID користувача")
+    cv_id = serializers.UUIDField(required=True)
 
 
 class ExtractTextFromCVResponseSerializer(serializers.Serializer):
-    text = serializers.CharField(help_text="Витягнутий текст з PDF")
-    method = serializers.CharField(help_text="Метод витягнення: 'pdf_text'")
-    cv_id = serializers.IntegerField(help_text="ID використаного CV")
-    filename = serializers.CharField(help_text="Ім'я файлу CV")
-
-
-class AnalyzeCVRequestSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField(help_text="ID користувача")
-
-
-class AnalyzeCVResponseSerializer(serializers.Serializer):
-    skills = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
-    languages = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
-    level = serializers.CharField(required=False, allow_null=True)
-    categories = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
-    countries = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
-    cities = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
-    is_office = serializers.BooleanField(required=False, allow_null=True)
-    is_remote = serializers.BooleanField(required=False, allow_null=True)
-    is_hybrid = serializers.BooleanField(required=False, allow_null=True)
-    willing_to_relocate = serializers.BooleanField(required=False, allow_null=True)
-    salary_min = serializers.IntegerField(required=False, allow_null=True, min_value=0)
-    salary_max = serializers.IntegerField(required=False, allow_null=True, min_value=0)
-    salary_currency = serializers.CharField(required=False, allow_null=True)
-
-
-class DownloadCVRequestSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField(help_text="ID користувача")
-    filename = serializers.CharField(help_text="Ім'я файлу CV")
+    text = serializers.CharField()
+    method_used = serializers.CharField()
+    extracted_cv_id = serializers.UUIDField()
+    filename = serializers.CharField()
