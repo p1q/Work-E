@@ -309,16 +309,37 @@ class LastCVByEmailPostView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@extend_schema(
-    tags=["CVs"],
-    summary="Извлечь текст из загруженного PDF резюме",
-    description="Принимает PDF-файл резюме через multipart/form-data и извлекает из него текстовое содержимое.",
-    #**EXTRACT_TEXT_FROM_CV_UPLOAD,
-    responses={
+EXTRACT_TEXT_FROM_CV_UPLOAD_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'cv_file': {
+            'type': 'string',
+            'format': 'binary',
+            'description': 'PDF-файл резюме для витягування тексту.'
+        }
+    },
+    'required': ['cv_file']
+}
+
+EXTRACT_TEXT_FROM_CV_UPLOAD = {
+    'request': {
+        'content': {
+            'multipart/form-data': EXTRACT_TEXT_FROM_CV_UPLOAD_SCHEMA
+        }
+    },
+    'responses': {
         200: ExtractTextFromCVResponseSerializer,
         400: OpenApiResponse(description='Помилка в запиті або обробці PDF'),
         500: OpenApiResponse(description='Внутрішня помилка сервера'),
-    },
+    }
+}
+
+
+@extend_schema(
+    tags=["CVs"],
+    summary="Витягти текст із завантаженого PDF резюме",
+    description="Приймає PDF-файл резюме через multipart/form-data та витягує з нього текстовий вміст.",
+    **EXTRACT_TEXT_FROM_CV_UPLOAD,
 )
 class ExtractTextFromCVView(APIView):
     permission_classes = [AllowAny]
@@ -341,7 +362,9 @@ class ExtractTextFromCVView(APIView):
 
             if not extracted_text:
                 logger.warning(f"Не вдалося видобути текст з завантаженого PDF файлу: {uploaded_pdf_file.name}")
-                return Response({'error': 'Не вдалося видобути текст з PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({
+                    'error': 'Не вдалося видобути текст з PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.'},
+                    status=status.HTTP_400_BAD_REQUEST)
 
             response_data = {
                 'text': extracted_text,
@@ -351,14 +374,17 @@ class ExtractTextFromCVView(APIView):
             }
             response_serializer = ExtractTextFromCVResponseSerializer(response_data)
 
-            logger.info(f"Успішно видобуто текст (метод: {method_used}) з завантаженого PDF файлу: {uploaded_pdf_file.name}")
+            logger.info(
+                f"Успішно видобуто текст (метод: {method_used}) з завантаженого PDF файлу: {uploaded_pdf_file.name}")
             return Response(response_serializer.data, status=status.HTTP_200_OK)
 
         except ValidationError as e:
             logger.warning(f"Помилка валідації при обробці PDF файлу {uploaded_pdf_file.name}: {e.message}")
             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Неочікувана помилка при видобуванні тексту з завантаженого PDF файлу {uploaded_pdf_file.name}: {e}", exc_info=True)
+            logger.error(
+                f"Неочікувана помилка при видобуванні тексту з завантаженого PDF файлу {uploaded_pdf_file.name}: {e}",
+                exc_info=True)
             return Response({'error': 'Внутрішня помилка сервера'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
