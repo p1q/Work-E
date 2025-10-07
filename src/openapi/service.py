@@ -9,7 +9,7 @@ from src.settings import OPENAPI_AI_URL
 logger = logging.getLogger(__name__)
 
 OPENAPI_AI_MODEL = getattr(settings, 'OPENAPI_AI_MODEL', 'qwen3-coder-plus')
-OPENAPI_AI_TIMEOUT = getattr(settings, 'OPENAPI_AI_TIMEOUT', 30)
+OPENAPI_AI_TIMEOUT = getattr(settings, 'OPENAPI_AI_TIMEOUT', 60)
 
 
 def call_openapi_ai(messages: list, model: str = None, chat_id: str = "", stream: bool = False,
