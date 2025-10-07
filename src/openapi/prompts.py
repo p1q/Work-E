@@ -41,7 +41,7 @@ CV_ANALYSIS_PROMPT = """
     6. is_remote: Boolean. Does the candidate accept fully remote work? If not mentioned, null.
     7. is_hybrid: Boolean. Does the candidate accept hybrid work? If not mentioned, null.
     8. willing_to_relocate: Boolean. Is the candidate willing to relocate? If not mentioned, null.
-    9. languages: Array of objects. Format: [{"language": "English", "level": "B2"}, ...]. Valid levels: "A1", "A2", "B1", "B2", "C1", "C2", "native". If level unknown, omit or use null.
+    9. languages: Array of objects. Format: [{{"language": "English", "level": "B2"}}, ...]. Valid levels: "A1", "A2", "B1", "B2", "C1", "C2", "native". If level unknown, omit or use null.
     10. skills: Array of strings. Technical skills only (e.g., ["Python", "Django", "Docker"]). Do not include soft skills. If none, [].
     11. salary_min: Positive integer. Minimum expected salary. If not specified, null.
     12. salary_max: Positive integer. Maximum expected salary. If not specified, null.

@@ -53,7 +53,6 @@ class CV(models.Model):
 
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cvs')
-
     first_name = models.CharField(max_length=80, validators=[validate_name])
     last_name = models.CharField(max_length=80, validators=[validate_name])
     email = models.EmailField(validators=[EmailValidator()])
@@ -67,7 +66,6 @@ class CV(models.Model):
     country_code = models.CharField(max_length=2, blank=True)
     overview = models.TextField(blank=True)
     hobbies = models.TextField(blank=True)
-
     position_target = models.CharField(max_length=120, blank=True)
     work_options = models.OneToOneField(WorkOptions, on_delete=models.CASCADE, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
@@ -79,7 +77,7 @@ class CV(models.Model):
     portfolio_url = models.URLField(blank=True)
     salary_min = models.PositiveIntegerField(null=True, blank=True)
     salary_max = models.PositiveIntegerField(null=True, blank=True)
-    salary_currency = models.CharField(max_length=3, blank=True)
+    salary_currency = models.CharField(max_length=3, blank=True, null=True)
     level = models.CharField(max_length=20, blank=True)
     categories = ArrayField(
         models.CharField(max_length=50),
