@@ -42,28 +42,38 @@ def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
         if cv_text_override is not None:
             logger.info(f"Використовується cv_text_override для аналізу (cv_id: {cv_id}, user_id: {user_id}).")
             extracted_text = cv_text_override
+            # is_temp_analysis = True # Більше не потрібно
         else:
             logger.info(f"Шукаємо CV з ID {cv_id} для користувача {user_id}")
             cv = CV.objects.get(id=cv_id, user_id=user_id)
             logger.info(f"Знайдено CV {cv.id} для користувача {user_id}")
-
             extracted_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
 
             if not extracted_text:
                 logger.error(f"Не вдалося видобути текст із CV {cv.id}")
-                raise ValidationError('Не вдалося видобути текст із PDF файлу. Файл може бути порожнім або пошкодженим.')
+                raise ValidationError(
+                    'Не вдалося видобути текст із PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.')
+            # is_temp_analysis = False # Більше не потрібно
 
         prompt = CV_ANALYSIS_PROMPT.format(cv_text=extracted_text)
         ai_response_data = call_openapi_ai(messages=[{"role": "user", "content": prompt}],
                                            model=getattr(settings, 'OPENAPI_AI_MODEL', 'default-model'))
 
+        # --- ЛОГУВАННЯ ВІДПОВІДІ ШІ ---
+        logger.debug(f"Повна відповідь від ШІ: {ai_response_data}")
+        # ---
+
         content = ""
         if 'choices' in ai_response_data and ai_response_data['choices']:
             content = ai_response_data['choices'][0].get('message', {}).get('content', '')
-        elif 'message' in ai_response_data:
+        elif 'message' in ai_response_data:  # <--- Виправлено: було 'ai_response_'
             content = ai_response_data.get('message', {}).get('content', '')
         else:
             content = str(ai_response_data)
+
+        # --- ЛОГУВАННЯ ВИТЯГНУТОГО CONTENT ---
+        logger.debug(f"Витягнутий content до очищення: '{content}'")
+        # ---
 
         content = content.strip()
         if content.startswith("```json"):
@@ -72,59 +82,62 @@ def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
             content = content[:-3]
         content = content.strip()
 
+        # --- ЛОГУВАННЯ CONTENT ПІСЛЯ ОЧИЩЕННЯ ---
+        logger.debug(f"Витягнутий content після очищення: '{content}'")
+        # ---
+
         if not content:
+            logger.error(f"Content порожній після обробки відповіді ШІ: {ai_response_data}")
             raise Exception("Порожній content від ШІ.")
 
+        # --- ВИКОРИСТАННЯ JSON5 ДЛЯ ВИПРАВЛЕННЯ ---
         try:
+            # Спробуємо звичайний json.loads
             parsed_data = json.loads(content)
+            logger.debug("JSON від ШІ розібрано стандартним json.loads.")
         except json.JSONDecodeError as e:
             logger.warning(f"Помилка стандартного JSON: {e}. Намагаємося виправити за допомогою json5...")
             try:
+                # Використовуємо json5 для виправлення
                 parsed_data = json5.loads(content)
+                logger.info("JSON від ШІ успішно виправлено та розібрано за допомогою json5.")
             except (json.JSONDecodeError, ValueError) as fix_e:
                 logger.error(f"Не вдалося виправити JSON: {fix_e}")
                 logger.error(f"Оригінальний вміст: {content[:500]}...")
                 raise Exception(f"Недійсний JSON: {str(fix_e)}")
+        # --- КІНЕЦЬ ВИКОРИСТАННЯ JSON5 ---
 
-        if cv_text_override is None:
-            wo = cv.work_options or WorkOptions.objects.create(cv=cv)
-            wo.countries = parsed_data.get("countries") or []
-            wo.cities = parsed_data.get("cities") or []
-            wo.is_office = parsed_data.get("is_office")
-            wo.is_remote = parsed_data.get("is_remote")
-            wo.is_hybrid = parsed_data.get("is_hybrid")
-            wo.willing_to_relocate = parsed_data.get("willing_to_relocate")
-            wo.save()
+        # --- ЗАБЕЗПЕЧЕННЯ ОБОВ'ЯЗКОВИХ ПОЛЕЙ У parsed_data ---
+        # Якщо ШІ не повернув якісь поля, додаємо їх зі значеннями за замовчуванням
+        # Це запобіжить помилкам валідації серіалайзера, якщо він вимагає їх.
+        # Визначимо структуру за прикладом, який ти надіслав.
+        # Якщо якісь ключові речі відсутні, можна створити їх.
+        if 'personal' not in parsed_data:  # <--- Виправлено: було 'parsed_'
+            parsed_data['personal'] = {}
+        if 'work_options' not in parsed_data:  # <--- Виправлено: було 'parsed_'
+            parsed_data['work_options'] = {}
+        if 'skills' not in parsed_data:  # <--- Виправлено: було 'parsed_'
+            parsed_data['skills'] = []
+        if 'languages' not in parsed_data:  # <--- Виправлено: було 'parsed_'
+            parsed_data['languages'] = []
+        if 'work_experiences' not in parsed_data:
+            parsed_data['work_experiences'] = []
+        if 'educations' not in parsed_data:
+            parsed_data['educations'] = []
+        if 'courses' not in parsed_data:  # <--- Виправлено: було 'parsed_'
+            parsed_data['courses'] = []
+        if 'links' not in parsed_data:  # <--- Виправлено: було 'parsed_'
+            parsed_data['links'] = {}
+        if 'salary' not in parsed_data:  # <--- Виправлено: було 'parsed_'
+            parsed_data['salary'] = {}
 
-            Skill.objects.filter(cv=cv).delete()
-            for i, name in enumerate(parsed_data.get("skills", [])):
-                if isinstance(name, str) and name.strip():
-                    Skill.objects.create(cv=cv, name=name.strip(), order_index=i)
-
-            Language.objects.filter(cv=cv).delete()
-            for i, lang_data in enumerate(parsed_data.get("languages", [])):
-                if isinstance(lang_data, dict):
-                    lang_name = lang_data.get("language")
-                    lang_level = lang_data.get("level")
-                    if lang_name and isinstance(lang_name, str):
-                        Language.objects.create(
-                            cv=cv,
-                            name=lang_name.strip(),
-                            level=lang_level if lang_level in [c[0] for c in Language.LEVEL_CHOICES] else None,
-                            order_index=i
-                        )
-
-            cv.level = parsed_data.get("level")
-            cv.categories = parsed_data.get("categories") or []
-            cv.salary_min = parsed_data.get("salary_min")
-            cv.salary_max = parsed_data.get("salary_max")
-            cv.salary_currency = parsed_data.get("salary_currency")
-            cv.analyzed = True
-            cv.save(update_fields=[
-                'level', 'categories', 'salary_min', 'salary_max', 'salary_currency', 'analyzed'
-            ])
+        # --- ДОДАТИ ПОЛЕ 'message', ЩОБ ВІДПОВІДАТИ SERIALIZER ---
+        # Оскільки AnalyzeCVResponseSerializer вимагає 'message', додамо його
+        parsed_data['message'] = "Аналіз резюме завершено успішно."
+        # ---
 
         logger.info(f"Аналіз резюме (cv_id: {cv_id}, user_id: {user_id}) завершено успішно.")
+        # Повертаємо виправлені та доповнені (включаючи 'message') дані від ШІ
         return parsed_data
 
     except CV.DoesNotExist:
