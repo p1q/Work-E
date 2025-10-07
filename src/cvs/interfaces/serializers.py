@@ -5,9 +5,15 @@ from django.contrib.auth import get_user_model
 from pikepdf import Pdf, PdfError
 from rest_framework import serializers
 
-from ..models import CV
+from ..models import CV, Personal
 
 User = get_user_model()
+
+
+class PersonalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Personal
+        fields = ['first_name', 'last_name', 'email', 'phone', 'date_of_birth', 'gender']
 
 
 class CVGenerationSerializer(serializers.Serializer):
@@ -24,6 +30,7 @@ class CoverLetterSerializer(serializers.Serializer):
 
 
 class CVSerializer(serializers.ModelSerializer):
+    personal = PersonalSerializer(read_only=True)
     cv_file = serializers.FileField(write_only=True)
     cv_file_name = serializers.CharField(source='cv_file', read_only=True)
     filename = serializers.CharField(read_only=True)
@@ -32,11 +39,7 @@ class CVSerializer(serializers.ModelSerializer):
         model = CV
         fields = [
             'id', 'user', 'cv_file', 'cv_file_name', 'filename',
-            'position_target',
-            'first_name', 'last_name', 'email',
-            'phone', 'date_of_birth', 'gender',
-            'street', 'city', 'postal_code', 'country',
-            'country_code', 'overview', 'hobbies',
+            'position_target', 'personal',
             'status', 'locale', 'created_at', 'updated_at',
             'linkedin_url', 'portfolio_url',
             'salary_min', 'salary_max', 'salary_currency',
@@ -45,19 +48,19 @@ class CVSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user', 'cv_file_name', 'filename', 'analyzed', 'created_at', 'updated_at']
 
     def validate_cv_file(self, file):
-        # 1) Size checks
+        # Проверка размера
         if file.size == 0:
             raise serializers.ValidationError("File cannot be empty.")
         if file.size > settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
             max_mb = settings.FILE_UPLOAD_MAX_MEMORY_SIZE // (1024 * 1024)
             raise serializers.ValidationError(f"Maximum allowed file size is {max_mb}MB.")
 
-        # 2) Extension check
+        # Проверка расширения файла
         ext = os.path.splitext(file.name)[1].lower()
         if ext != '.pdf':
             raise serializers.ValidationError("Only PDF files are allowed.")
 
-        # 3) PDF content validation via pikepdf
+        # Проверка содержимого PDF через pikepdf
         try:
             self._validate_pdf_with_pikepdf(file)
         except serializers.ValidationError:
@@ -76,13 +79,12 @@ class CVSerializer(serializers.ModelSerializer):
         except PdfError:
             raise serializers.ValidationError("Invalid or corrupted PDF file.")
 
-        # Empty PDF?
+        # Проверка на пустой PDF
         if len(pdf.pages) == 0:
             raise serializers.ValidationError("Empty PDF file.")
 
-        # Check for any embedded files/attachments
+        # Проверка на вложенные файлы
         try:
-            # QPDF exposes embedded files under pdf.attachments
             attachments = list(pdf.attachments.keys())
         except Exception:
             attachments = []
