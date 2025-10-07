@@ -14,6 +14,7 @@ from drf_spectacular.utils import extend_schema, OpenApiResponse
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from jsonschema import ValidationError
 from rest_framework import generics
+from rest_framework import serializers
 from rest_framework import status
 from rest_framework.parsers import JSONParser
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -24,8 +25,8 @@ from rest_framework.views import APIView
 from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV_DELETE_RESPONSE, CV_BY_EMAIL,
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
 from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer, CVSerializer, CoverLetterSerializer, \
-    CVGenerationSerializer, DownloadCVRequestSerializer, ExtractTextFromCVRequestSerializer, \
-    ExtractTextFromCVResponseSerializer, User, ExtractTextFromCVUploadRequestSerializer
+    CVGenerationSerializer, DownloadCVRequestSerializer, ExtractTextFromCVResponseSerializer, User, \
+    ExtractTextFromCVUploadRequestSerializer
 from ..models import CV
 from ..service import analyze_cv_with_ai, extract_text_from_cv, extract_text_from_pdf_bytes
 
@@ -388,18 +389,37 @@ class ExtractTextFromCVView(APIView):
             return Response({'error': 'Внутрішня помилка сервера'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+ANALYZE_CV_UPLOAD_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'cv_file': {
+            'type': 'string',
+            'format': 'binary',
+            'description': 'PDF файл резюме для аналізу.'
+        }
+    },
+    'required': ['cv_file']
+}
+
+ANALYZE_CV_UPLOAD = {
+    'request': {
+        'content': {
+            'multipart/form-data': ANALYZE_CV_UPLOAD_SCHEMA
+        }
+    },
+    'responses': {
+        200: AnalyzeCVResponseSerializer,
+        400: OpenApiResponse(description='Помилка в запиті або обробці PDF'),
+        500: OpenApiResponse(description='Внутрішня помилка сервера'),
+    }
+}
+
+
 @extend_schema(
     tags=["CVs"],
-    summary="Проаналізувати резюме користувача за допомогою ШІ",
-    description="Отримує останнє завантажене резюме користувача за його ID, "
-                "видобуває текст, потім надсилає текст до ШІ для аналізу та "
-                "видобування структурованих даних.",
-    request=AnalyzeCVRequestSerializer,
-    responses={200: AnalyzeCVResponseSerializer,
-               400: OpenApiResponse(description='Помилка в запиті або даних користувача/CV'),
-               404: OpenApiResponse(description='Користувач або CV не знайдено'),
-               500: OpenApiResponse(description='Помилка сервера під час обробки PDF або взаємодії з ШІ'),
-               503: OpenApiResponse(description='Сервіс ШІ недоступний')},
+    summary="Аналізувати резюме з PDF файлу за допомогою ШІ",
+    description="Приймає PDF-файл резюме через multipart/form-data, витягує з нього текст, потім надсилає текст до ШІ для аналізу та видобування структурованих даних.",
+    **ANALYZE_CV_UPLOAD,
 )
 class AnalyzeCVView(APIView):
     permission_classes = [AllowAny]
@@ -496,3 +516,18 @@ class GetDownloadLinkView(APIView):
         logger.info(
             f"Згенеровано одноразове посилання для завантаження CV '{cv.cv_file.name}' для користувача {user_id}. Посилання: {download_url}")
         return Response({'download_url': download_url}, status=status.HTTP_200_OK)
+
+
+class AnalyzeCVUploadRequestSerializer(serializers.Serializer):
+    cv_file = serializers.FileField(
+        required=True,
+        help_text="PDF файл резюме для аналізу."
+    )
+
+    def validate_cv_file(self, value):
+        ext = os.path.splitext(value.name)[1].lower()
+        if ext != '.pdf':
+            raise ValidationError('Файл повинен бути у форматі PDF.')
+        if not value.content_type.startswith('application/pdf'):
+            logger.warning(f"Завантажений файл {value.name} має тип {value.content_type}, очікувався application/pdf.")
+        return value
