@@ -368,8 +368,8 @@ class ExtractTextFromCVView(APIView):
 
             response_data = {
                 'text': extracted_text,
-                'method': method_used,
-                'cv_id': None,
+                'method_used': method_used,
+                'extracted_cv_id': None,
                 'filename': uploaded_pdf_file.name
             }
             response_serializer = ExtractTextFromCVResponseSerializer(response_data)
