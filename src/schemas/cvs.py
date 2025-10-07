@@ -1,5 +1,12 @@
+import os
+
+from django.core.exceptions import ValidationError
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
+from rest_framework import serializers
+import logging
+
+logger = logging.getLogger(__name__)
 
 CV_SCHEMA_EXAMPLE = {
     'id': 1,
@@ -74,3 +81,18 @@ CV_LAST_BY_EMAIL = {
 CV_LIST_PARAMETERS = [
     OpenApiParameter(name='email', description='Фільтр по email', required=False, type=OpenApiTypes.EMAIL)
 ]
+
+
+class ExtractTextFromCVUploadRequestSerializer(serializers.Serializer):
+    cv_file = serializers.FileField(
+        required=True,
+        help_text="PDF файл резюме для извлечения текста."
+    )
+
+    def validate_cv_file(self, value):
+        ext = os.path.splitext(value.name)[1].lower()
+        if ext != '.pdf':
+            raise ValidationError('Файл должен быть в формате PDF.')
+        if not value.content_type.startswith('application/pdf'):
+            logger.warning(f"Загруженный файл {value.name} имеет тип {value.content_type}, ожидался application/pdf.")
+        return value
