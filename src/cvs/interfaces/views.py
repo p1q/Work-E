@@ -418,46 +418,57 @@ ANALYZE_CV_UPLOAD = {
 @extend_schema(
     tags=["CVs"],
     summary="Аналізувати резюме з PDF файлу за допомогою ШІ",
-    description="Приймає PDF-файл резюме через multipart/form-data, витягує з нього текст, потім надсилає текст до ШІ для аналізу та видобування структурованих даних.",
+    description="Приймає PDF-файл резюме, витягує з нього текст, потім надсилає текст до ШІ для аналізу та видобування структурованих даних.",
     **ANALYZE_CV_UPLOAD,
 )
 class AnalyzeCVView(APIView):
     permission_classes = [AllowAny]
-    parser_classes = [JSONParser]
+    parser_classes = [MultiPartParser, FormParser]
 
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         logger = logging.getLogger(__name__)
-        serializer = AnalyzeCVRequestSerializer(data=request.data)
-        validation_response = handle_serializer_validation(serializer, logger, "AnalyzeCVView")
-        if validation_response:
-            return validation_response
-        user_id = serializer.validated_data.get('user_id')
+        serializer = AnalyzeCVUploadRequestSerializer(data=request.data)
 
-        cv, error_response = _get_latest_cv_for_user(user_id, logger)
-        if error_response:
-            return error_response
+        if not serializer.is_valid():
+            logger.warning(f"Недійсні дані запиту для AnalyzeCVView: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        uploaded_pdf_file = serializer.validated_data.get('cv_file')
+
         try:
-            cv_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
-            if not cv_text:
-                logger.warning(f"Не вдалося видобути текст з CV {cv.id} для користувача {user_id}")
-                return Response({'error': 'Не вдалося видобути текст з резюме.'}, status=status.HTTP_400_BAD_REQUEST)
+            pdf_content_bytes = uploaded_pdf_file.read()
+            pdf_stream = io.BytesIO(pdf_content_bytes)
 
-            ai_extracted_data = analyze_cv_with_ai(cv.id, user_id, cv_text_override=cv_text)
+            extracted_text, method_used = extract_text_from_pdf_bytes(pdf_stream)
+
+            if not extracted_text:
+                logger.warning(f"Не вдалося видобути текст з завантаженого PDF файлу: {uploaded_pdf_file.name}")
+                return Response({
+                                    'error': 'Не вдалося видобути текст з PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            import uuid
+            anonymous_user_id = uuid.uuid4()
+            temp_cv_id = uuid.uuid4()
+
+            ai_extracted_data = analyze_cv_with_ai(temp_cv_id, anonymous_user_id, cv_text_override=extracted_text)
+
             response_serializer = AnalyzeCVResponseSerializer(data=ai_extracted_data)
             if response_serializer.is_valid():
-                logger.info(f"Аналіз CV {cv.id} для користувача {user_id} успішно завершено.")
+                logger.info(f"Аналіз завантаженого PDF файлу {uploaded_pdf_file.name} успішно завершено.")
                 return Response(response_serializer.data, status=status.HTTP_200_OK)
             else:
-                logger.warning(
-                    f"ШІ повернув недійсні дані для CV {cv.id} користувача {user_id}: {response_serializer.errors}")
-                return Response({"error": "ШІ повернув недійсні дані"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                logger.error(
+                    f"Помилка валідації даних ШІ для файлу {uploaded_pdf_file.name}: {response_serializer.errors}")
+                return Response({'error': 'Внутрішня помилка сервера при обробці даних ШІ'},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         except ValidationError as e:
-            logger.warning(f"Помилка валідації при аналізі CV для користувача {user_id}: {e.message}")
-            if "не знайдено" in str(e) or "видобути текст" in str(e):
-                return Response({'error': e.message}, status=status.HTTP_404_NOT_FOUND)
+            logger.warning(f"Помилка валідації при обробці PDF файлу {uploaded_pdf_file.name}: {e.message}")
             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Неочікувана помилка при аналізі CV для користувача {user_id}: {e}", exc_info=True)
+            logger.error(f"Неочікувана помилка при аналізі завантаженого PDF файлу {uploaded_pdf_file.name}: {e}",
+                         exc_info=True)
             return Response({'error': 'Внутрішня помилка сервера'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
