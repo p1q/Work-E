@@ -23,39 +23,18 @@ def extract_text_from_cv(cv):
         pdf_content = cv_file.read()
         cv_file.close()
         pdf_stream = io.BytesIO(pdf_content)
-        extracted_text = ""
-        method_used = "pdf_text"
-
-        try:
-            with pdfplumber.open(pdf_stream) as pdf:
-                text_parts = []
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        cleaned_page_text = ''.join(line for line in page_text.splitlines() if line.strip())
-                        text_parts.append(cleaned_page_text)
-                extracted_text = "".join(text_parts).strip()
-        except Exception as e:
-            logger.error(f"Помилка pdfplumber для CV {cv.id}: {e}", exc_info=True)
-            raise ValidationError(
-                'Не вдалося видобути текст із PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.')
-
-        if extracted_text:
-            logger.debug(f"Успішно видобуто текст з CV {cv.id} методом {method_used}.")
-            return extracted_text, method_used, cv.id, cv.cv_file.name
-        else:
-            logger.warning(f"Не вдалося видобути текст із CV {cv.id}")
-            raise ValidationError(
-                'Не вдалося видобути текст із PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.')
+        extracted_text, method_used = extract_text_from_pdf_bytes(pdf_stream)
+        return extracted_text, method_used, cv.id, cv.cv_file.name
 
     except FileNotFoundError:
         file_path = cv.cv_file.path if cv.cv_file else "Шлях невідомий"
         logger.error(f"Файл CV для CV {cv.id} не знайдено на диску за шляхом: {file_path}")
         raise ValidationError(f'Файл резюме не знайдено на сервері за шляхом: {file_path}')
+    except ValidationError:
+        raise
     except Exception as e:
         logger.error(f"Неочікувана помилка під час видобування тексту для CV {cv.id}: {e}", exc_info=True)
         raise ValidationError(f'Сталася неочікувана помилка під час обробки файлу резюме: {str(e)}')
-
 
 def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
     try:
@@ -64,7 +43,6 @@ def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
         logger.error(f"CV з ID {cv_id} для користувача {user_id} не знайдено.")
         raise ValidationError("CV не знайдено.")
 
-    # Видобути текст
     if cv_text_override is not None:
         cv_text = cv_text_override
         logger.debug(f"Використано наданий текст для CV {cv.id}.")
@@ -166,3 +144,29 @@ def analyze_cv_with_ai(cv_id, user_id, cv_text_override=None):
         "salary_max": cv.salary_max,
         "salary_currency": cv.salary_currency,
     }
+
+def extract_text_from_pdf_bytes(pdf_stream: io.BytesIO):
+    extracted_text = ""
+    method_used = "pdf_text"
+
+    try:
+        with pdfplumber.open(pdf_stream) as pdf:
+            text_parts = []
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    cleaned_page_text = ''.join(line for line in page_text.splitlines() if line.strip())
+                    text_parts.append(cleaned_page_text)
+            extracted_text = "".join(text_parts).strip()
+    except Exception as e:
+        logger.error(f"Помилка pdfplumber при обробці BytesIO: {e}", exc_info=True)
+        raise ValidationError(
+            'Не вдалося видобути текст із PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.')
+
+    if not extracted_text:
+        logger.warning("PDF BytesIO не містить витягненого тексту.")
+        raise ValidationError(
+            'Не вдалося видобути текст із PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.')
+
+    logger.debug(f"Успішно видобуто текст з PDF BytesIO, методом {method_used}.")
+    return extracted_text, method_used

@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import time
@@ -24,9 +25,9 @@ from src.schemas.cvs import (CV_LIST_RESPONSE, CV_CREATE, CV_DETAIL_RESPONSE, CV
                              CV_LAST_BY_EMAIL, CV_LIST_PARAMETERS)
 from .serializers import AnalyzeCVRequestSerializer, AnalyzeCVResponseSerializer, CVSerializer, CoverLetterSerializer, \
     CVGenerationSerializer, DownloadCVRequestSerializer, ExtractTextFromCVRequestSerializer, \
-    ExtractTextFromCVResponseSerializer, User
+    ExtractTextFromCVResponseSerializer, User, ExtractTextFromCVUploadRequestSerializer
 from ..models import CV
-from ..service import analyze_cv_with_ai, extract_text_from_cv
+from ..service import analyze_cv_with_ai, extract_text_from_cv, extract_text_from_pdf_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -310,55 +311,54 @@ class LastCVByEmailPostView(APIView):
 
 @extend_schema(
     tags=["CVs"],
-    summary="Видобути текст із останнього резюме користувача",
-    description="Отримує останнє завантажене резюме користувача за його ID "
-                "та видобуває з нього текстовий вміст.",
-    request=ExtractTextFromCVRequestSerializer,
-    responses={200: ExtractTextFromCVResponseSerializer,
-               400: OpenApiResponse(description='Помилка в запиті або обробці PDF'),
-               404: OpenApiResponse(description='Користувач або CV не знайдено'),
-               500: OpenApiResponse(description='Внутрішня помилка сервера')},
+    summary="Извлечь текст из загруженного PDF резюме",
+    description="Принимает PDF-файл резюме через multipart/form-data и извлекает из него текстовое содержимое.",
+    #**EXTRACT_TEXT_FROM_CV_UPLOAD,
+    responses={
+        200: ExtractTextFromCVResponseSerializer,
+        400: OpenApiResponse(description='Помилка в запиті або обробці PDF'),
+        500: OpenApiResponse(description='Внутрішня помилка сервера'),
+    },
 )
 class ExtractTextFromCVView(APIView):
     permission_classes = [AllowAny]
-    parser_classes = [JSONParser]
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request, *args, **kwargs):
         logger = logging.getLogger(__name__)
-        serializer = ExtractTextFromCVRequestSerializer(data=request.data)
-        validation_response = handle_serializer_validation(serializer, logger, "ExtractTextFromCVView")
-        if validation_response:
-            return validation_response
+        serializer = ExtractTextFromCVUploadRequestSerializer(data=request.data)
 
-        user_id = serializer.validated_data.get('user_id')
+        if not serializer.is_valid():
+            logger.warning(f"Недійсні дані запиту для ExtractTextFromCVView: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        cv, error_response = _get_latest_cv_for_user(user_id, logger)
-        if error_response:
-            return error_response
+        uploaded_pdf_file = serializer.validated_data.get('cv_file')
 
         try:
-            cv_text, method_used, extracted_cv_id, filename = extract_text_from_cv(cv)
+            pdf_content_bytes = uploaded_pdf_file.read()
+            pdf_stream = io.BytesIO(pdf_content_bytes)
+            extracted_text, method_used = extract_text_from_pdf_bytes(pdf_stream)
 
-            if not cv_text:
-                logger.warning(f"Не вдалося видобути текст з CV {cv.id} для користувача {user_id}")
-                return Response({'error': 'Не вдалося видобути текст з резюме.'}, status=status.HTTP_400_BAD_REQUEST)
+            if not extracted_text:
+                logger.warning(f"Не вдалося видобути текст з завантаженого PDF файлу: {uploaded_pdf_file.name}")
+                return Response({'error': 'Не вдалося видобути текст з PDF файлу. Файл може бути сканованим (без текстового шару), порожнім або пошкодженим.'}, status=status.HTTP_400_BAD_REQUEST)
 
             response_data = {
-                'text': cv_text,
+                'text': extracted_text,
                 'method': method_used,
-                'cv_id': extracted_cv_id,
-                'filename': filename
+                'cv_id': None,
+                'filename': uploaded_pdf_file.name
             }
             response_serializer = ExtractTextFromCVResponseSerializer(response_data)
-            logger.info(f"Успішно видобуто текст (метод: {method_used}) з CV {cv.id} для користувача {user_id}")
+
+            logger.info(f"Успішно видобуто текст (метод: {method_used}) з завантаженого PDF файлу: {uploaded_pdf_file.name}")
             return Response(response_serializer.data, status=status.HTTP_200_OK)
 
         except ValidationError as e:
-            logger.warning(f"Помилка валідації при видобуванні тексту з CV для користувача {user_id}: {e.message}")
+            logger.warning(f"Помилка валідації при обробці PDF файлу {uploaded_pdf_file.name}: {e.message}")
             return Response({'error': e.message}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Неочікувана помилка при видобуванні тексту з CV для користувача {user_id}: {e}",
-                         exc_info=True)
+            logger.error(f"Неочікувана помилка при видобуванні тексту з завантаженого PDF файлу {uploaded_pdf_file.name}: {e}", exc_info=True)
             return Response({'error': 'Внутрішня помилка сервера'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

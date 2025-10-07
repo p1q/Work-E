@@ -1,8 +1,11 @@
+import os
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
 from ..models import CV, WorkExperience, Education, Course, Skill, Language, Personal, Address, WorkOptions
+from ..service import logger
 
 User = get_user_model()
 
@@ -313,3 +316,17 @@ class ExtractTextFromCVResponseSerializer(serializers.Serializer):
     method_used = serializers.CharField()
     extracted_cv_id = serializers.UUIDField()
     filename = serializers.CharField()
+
+class ExtractTextFromCVUploadRequestSerializer(serializers.Serializer):
+    cv_file = serializers.FileField(
+        required=True,
+        help_text="PDF-файл резюме для витягування тексту."
+    )
+
+    def validate_cv_file(self, value):
+        ext = os.path.splitext(value.name)[1].lower()
+        if ext != '.pdf':
+            raise ValidationError('Файл повинен бути у форматі PDF.')
+        if not value.content_type.startswith('application/pdf'):
+            logger.warning(f"Завантажений файл {value.name} має тип {value.content_type}, очікувався application/pdf.")
+        return value
